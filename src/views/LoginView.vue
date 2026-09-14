@@ -1,7 +1,11 @@
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import AuthLayout from '../components/AuthLayout.vue'
 import warehouseImg from '../assets/image_0.png'
+
+
+const router = useRouter()
 
 const email = ref('')
 const password = ref('')
@@ -13,6 +17,8 @@ const togglePassword = () => {
 
 const handleLogin = () => {
   console.log('Logging in...', email.value)
+  // Redirect to the products dashboard upon login
+  router.push('/products')
 }
 </script>
 
@@ -24,7 +30,7 @@ const handleLogin = () => {
 
     <template #default>
       <div class="login-header">
-        <h2 class="title">Welcome Back!</h2>
+        <h2 class="title">Welcome!</h2>
         <p class="subtitle">Please enter your login details below</p>
       </div>
 
@@ -97,7 +103,6 @@ const handleLogin = () => {
   color: #D8DAF9;
 }
 
-
 :deep(.illustration-container),
 :deep(.illustration-wrapper),
 :deep([class*="illustration"]) {
@@ -113,11 +118,17 @@ const handleLogin = () => {
   object-fit: cover !important;
 }
 
-
 .login-header {
   text-align: left;
   margin-top: -16px;
   margin-bottom: 28px;
+}
+
+.brand-logo {
+  height: 40px;
+  width: auto;
+  margin-bottom: 16px;
+  display: block;
 }
 
 .title {
@@ -154,14 +165,12 @@ const handleLogin = () => {
   color: #1F2344;
 }
 
-
 .password-wrapper {
   position: relative;
   width: 100%;
   display: flex;
   align-items: center;
 }
-
 
 .input-group input {
   width: 100%;
@@ -185,7 +194,6 @@ const handleLogin = () => {
   border-color: #656ba1;
   background-color: #ffffff;
 }
-
 
 .eye-button {
   position: absolute;
@@ -219,7 +227,6 @@ const handleLogin = () => {
   color: #4c51bf;
   text-decoration: none;
 }
-
 
 .auth-button {
   width: 100%;
