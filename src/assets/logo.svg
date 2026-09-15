@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 120" width="100%" height="100%">
+  <defs>
+    <!-- Gradients for 3D Inventory Vault Box -->
+    <linearGradient id="topFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9397C7" />
+      <stop offset="100%" stop-color="#656BA1" />
+    </linearGradient>
+
+    <linearGradient id="leftFace" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4A5080" />
+      <stop offset="100%" stop-color="#1F2344" />
+    </linearGradient>
+
+    <linearGradient id="rightFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#656BA1" />
+      <stop offset="100%" stop-color="#343963" />
+    </linearGradient>
+
+    <!-- Accent Glow for Lock / Order Badge -->
+    <linearGradient id="accentGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EBE2FF" />
+      <stop offset="100%" stop-color="#D8DAF9" />
+    </linearGradient>
+  </defs>
+
+  <!-- ================= LOGO ICON (Vault + Inventory Box) ================= -->
+  <g transform="translate(10, 10)">
+    <!-- Top Box Flap / Isometric Top -->
+    <polygon points="50,10 88,30 50,50 12,30" fill="url(#topFace)" />
+
+    <!-- Left Side Box Face -->
+    <polygon points="12,30 50,50 50,94 12,74" fill="url(#leftFace)" />
+
+    <!-- Right Side Box Face -->
+    <polygon points="50,50 88,30 88,74 50,94" fill="url(#rightFace)" />
+
+    <!-- Isometric Package Tape / Box Seam Line -->
+    <path d="M 31 20 L 50 30 L 69 20" stroke="#D8DAF9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.8" />
+
+    <!-- Vault Dial & Keyhole (Inventory Security Emblem on Front Center) -->
+    <circle cx="50" cy="62" r="13" fill="#1F2344" stroke="url(#accentGlow)" stroke-width="2.5" />
+    <circle cx="50" cy="62" r="6" fill="none" stroke="#D8DAF9" stroke-width="1.5" stroke-dasharray="3 2" />
+    <circle cx="50" cy="62" r="2.5" fill="#D8DAF9" />
+    <line x1="50" y1="64.5" x2="50" y2="68" stroke="#D8DAF9" stroke-width="2" stroke-linecap="round" />
+
+    <!-- Dynamic Order Arrow / Box Checkmark Accent -->
+    <path d="M 72 60 L 80 68 L 94 52" stroke="#6366F1" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  </g>
+
+  <!-- ================= TYPOGRAPHY ================= -->
+  <!-- Brand Name: VAULTO -->
+  <text x="125" y="68" 
+        font-family="'Commissioner', 'Inter', 'Segoe UI', sans-serif" 
+        font-size="48" 
+        font-weight="400" 
+        letter-spacing="2" 
+        fill="#D8DAF9">
+    VAULTO
+  </text>
+
+  <!-- Subtitle Tagline: INVENTORY & ORDER MANAGEMENT -->
+  <text x="127" y="88" 
+        font-family="'Commissioner', 'Inter', 'Segoe UI', sans-serif" 
+        font-size="10" 
+        font-weight="600" 
+        letter-spacing="3" 
+        fill="#9397C7">
+    INVENTORY &amp; ORDER MANAGEMENT
+  </text>
+</svg>
