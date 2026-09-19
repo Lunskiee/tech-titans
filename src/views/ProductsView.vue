@@ -124,6 +124,7 @@ const deleteProduct = (id) => {
           type="text" 
           placeholder="Search by product name or SKU..." 
           class="search-input" 
+          data-testid="product-search-input"
         />
         <div class="user-profile">
           <span class="bell-icon">🔔</span>
@@ -135,21 +136,32 @@ const deleteProduct = (id) => {
       <!-- Content Area -->
       <div class="content-body">
         <div class="action-bar">
-          <button class="btn-add" @click="openAddModal">+ Add Product</button>
+          <button 
+            class="btn-add" 
+            @click="openAddModal" 
+            data-testid="add-product-button"
+          >
+            + Add Product
+          </button>
           
           <!-- Filter Dropdown -->
           <div class="filter-wrapper">
-            <button class="btn-filter" @click="showFilterDropdown = !showFilterDropdown">
+            <button 
+              class="btn-filter" 
+              @click="showFilterDropdown = !showFilterDropdown"
+              data-testid="filter-dropdown-button"
+            >
               ⊞ Filter by Category: <strong>{{ selectedCategory }}</strong>
             </button>
 
-            <div v-if="showFilterDropdown" class="filter-dropdown">
+            <div v-if="showFilterDropdown" class="filter-dropdown" data-testid="filter-dropdown-list">
               <div 
                 v-for="cat in filterCategories" 
                 :key="cat" 
                 class="filter-item"
                 :class="{ active: selectedCategory === cat }"
                 @click="selectFilter(cat)"
+                data-testid="filter-category-item"
               >
                 {{ cat === 'All' ? 'All Categories' : cat }}
               </div>
@@ -159,7 +171,7 @@ const deleteProduct = (id) => {
 
         <!-- Data Table -->
         <div class="table-card">
-          <table>
+          <table data-testid="products-table">
             <thead>
               <tr>
                 <th>SKU</th>
@@ -172,7 +184,7 @@ const deleteProduct = (id) => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in filteredProducts" :key="item.id">
+              <tr v-for="item in filteredProducts" :key="item.id" data-testid="product-row">
                 <td>{{ item.sku }}</td>
                 <td>
                   <img v-if="item.image" :src="item.image" class="table-thumbnail" alt="Product Image" />
@@ -183,12 +195,12 @@ const deleteProduct = (id) => {
                 <td>{{ item.stock }} {{ item.unit }}</td>
                 <td>${{ item.price }}</td>
                 <td class="action-cells">
-                  <button class="btn-edit" @click="openEditModal(item)">Edit</button>
-                  <button class="btn-delete" @click="deleteProduct(item.id)">Delete</button>
+                  <button class="btn-edit" @click="openEditModal(item)" data-testid="product-edit-button">Edit</button>
+                  <button class="btn-delete" @click="deleteProduct(item.id)" data-testid="product-delete-button">Delete</button>
                 </td>
               </tr>
               <tr v-if="filteredProducts.length === 0">
-                <td colspan="7" class="empty-state">
+                <td colspan="7" class="empty-state" data-testid="empty-products-message">
                   No products found matching your search or category filter.
                 </td>
               </tr>

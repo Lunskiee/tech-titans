@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import AuthLayout from '../components/AuthLayout.vue'
 import warehouseImg from '../assets/image_0.png'
 
-
 const router = useRouter()
 
 const email = ref('')
@@ -34,7 +33,7 @@ const handleLogin = () => {
         <p class="subtitle">Please enter your login details below</p>
       </div>
 
-      <form @submit.prevent="handleLogin" class="auth-form">
+      <form @submit.prevent="handleLogin" class="auth-form" data-testid="login-form">
         <div class="input-group">
           <label for="email">Email</label>
           <input 
@@ -43,6 +42,7 @@ const handleLogin = () => {
             type="email" 
             placeholder="Enter Email" 
             required 
+            data-testid="login-email-input"
           />
         </div>
 
@@ -55,12 +55,14 @@ const handleLogin = () => {
               :type="showPassword ? 'text' : 'password'" 
               placeholder="Enter Password" 
               required 
+              data-testid="login-password-input"
             />
             <button 
               type="button" 
               class="eye-button" 
               @click="togglePassword"
               :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              data-testid="login-toggle-password-button"
             >
               <!-- Open Eye (Shown when password IS visible) -->
               <svg v-if="showPassword" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -79,14 +81,32 @@ const handleLogin = () => {
         </div>
 
         <div class="form-actions">
-          <router-link to="/forgot-password" class="forgot-password">Forgot Password?</router-link>
+          <router-link 
+            to="/forgot-password" 
+            class="forgot-password"
+            data-testid="login-forgot-password-link"
+          >
+            Forgot Password?
+          </router-link>
         </div>
 
-        <button type="submit" class="auth-button">Log In</button>
+        <button 
+          type="submit" 
+          class="auth-button"
+          data-testid="login-submit-button"
+        >
+          Log In
+        </button>
       </form>
 
       <div class="footer-link">
-        Don't have an account yet? <router-link to="/signup">Sign Up here</router-link>
+        Don't have an account yet? 
+        <router-link 
+          to="/signup"
+          data-testid="login-signup-link"
+        >
+          Sign Up here
+        </router-link>
       </div>
     </template>
   </AuthLayout>

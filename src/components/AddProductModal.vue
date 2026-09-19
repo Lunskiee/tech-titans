@@ -98,34 +98,46 @@ const handleSubmit = () => {
 </script>
 
 <template>
-  <div v-if="isOpen" class="modal-overlay" @click.self="handleClose">
-    <div class="modal-card">
+  <div v-if="isOpen" class="modal-overlay" @click.self="handleClose" data-testid="product-modal-overlay">
+    <div class="modal-card" data-testid="product-modal">
       <div class="modal-header">
-        <h3>{{ form.id ? 'Edit Product' : 'Add Product' }}</h3>
-        <button type="button" class="close-btn" @click="handleClose">&times;</button>
+        <h3 data-testid="product-modal-title">{{ form.id ? 'Edit Product' : 'Add Product' }}</h3>
+        <button type="button" class="close-btn" @click="handleClose" data-testid="product-modal-close-button">&times;</button>
       </div>
 
-      <form @submit.prevent="handleSubmit" class="modal-body">
+      <form @submit.prevent="handleSubmit" class="modal-body" data-testid="product-form">
         <div class="form-row">
           <label>Product Name</label>
-          <input v-model="form.name" type="text" placeholder="Enter product name" required />
+          <input 
+            v-model="form.name" 
+            type="text" 
+            placeholder="Enter product name" 
+            required 
+            data-testid="product-name-input"
+          />
         </div>
 
         <div class="form-row">
           <label>SKU / Item Code</label>
-          <input v-model="form.sku" type="text" disabled class="disabled-input" />
+          <input 
+            v-model="form.sku" 
+            type="text" 
+            disabled 
+            class="disabled-input" 
+            data-testid="product-sku-input"
+          />
         </div>
 
         <div class="form-row">
           <label>Category</label>
-          <select v-model="form.category">
+          <select v-model="form.category" data-testid="product-category-select">
             <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
           </select>
         </div>
 
         <div class="form-row">
           <label>Unit Type</label>
-          <select v-model="form.unitType">
+          <select v-model="form.unitType" data-testid="product-unit-select">
             <option>Pieces (pcs)</option>
             <option>Boxes (box)</option>
           </select>
@@ -136,11 +148,23 @@ const handleSubmit = () => {
         <div class="grid-2">
           <div class="form-group">
             <label>In Stock Quantity</label>
-            <input v-model="form.quantity" type="number" min="0" required />
+            <input 
+              v-model="form.quantity" 
+              type="number" 
+              min="0" 
+              required 
+              data-testid="product-quantity-input"
+            />
           </div>
           <div class="form-group">
             <label>Unit Price ($)</label>
-            <input v-model="form.price" type="text" placeholder="0.00" required />
+            <input 
+              v-model="form.price" 
+              type="text" 
+              placeholder="0.00" 
+              required 
+              data-testid="product-price-input"
+            />
           </div>
         </div>
 
@@ -148,8 +172,8 @@ const handleSubmit = () => {
           <label>Product Thumbnail</label>
           
           <!-- Container when image exists -->
-          <div v-if="form.image" class="preview-container">
-            <img :src="form.image" class="image-preview" alt="Thumbnail Preview" />
+          <div v-if="form.image" class="preview-container" data-testid="product-image-preview-container">
+            <img :src="form.image" class="image-preview" alt="Thumbnail Preview" data-testid="product-image-preview" />
             <div class="preview-actions">
               <label class="btn-change">
                 Change
@@ -159,16 +183,22 @@ const handleSubmit = () => {
                   @change="handleFileUpload" 
                   accept="image/*" 
                   class="hidden-input" 
+                  data-testid="product-image-change-input"
                 />
               </label>
-              <button type="button" class="btn-remove-img" @click="removeImage">
+              <button 
+                type="button" 
+                class="btn-remove-img" 
+                @click="removeImage"
+                data-testid="product-image-remove-button"
+              >
                 Remove Image
               </button>
             </div>
           </div>
 
           <!-- Drop zone when no image -->
-          <label v-else class="drop-zone">
+          <label v-else class="drop-zone" data-testid="product-image-dropzone">
             <svg class="cloud-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M16 16l-4-4-4 4M12 12v9" />
               <path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3" />
@@ -180,13 +210,25 @@ const handleSubmit = () => {
               @change="handleFileUpload" 
               accept="image/*" 
               class="hidden-input" 
+              data-testid="product-image-upload-input"
             />
           </label>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn-cancel" @click="handleClose">Cancel</button>
-          <button type="submit" class="btn-save">
+          <button 
+            type="button" 
+            class="btn-cancel" 
+            @click="handleClose"
+            data-testid="product-modal-cancel-button"
+          >
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            class="btn-save"
+            data-testid="product-modal-save-button"
+          >
             {{ form.id ? 'Update Product' : 'Save Product' }}
           </button>
         </div>
