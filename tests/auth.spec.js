@@ -2,7 +2,6 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Authentication Flow', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigates directly to your local dev server running on port 5173
     await page.goto('http://localhost:5173/')
   })
 
