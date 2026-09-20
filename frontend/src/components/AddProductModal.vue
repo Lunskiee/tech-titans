@@ -104,22 +104,22 @@ const handleSubmit = () => {
       <form @submit.prevent="handleSubmit" class="modal-body" data-testid="product-form">
         <div class="form-row">
           <label>Product Name</label>
-          <input 
-            v-model="form.name" 
-            type="text" 
-            placeholder="Enter product name" 
-            required 
+          <input
+            v-model="form.name"
+            type="text"
+            placeholder="Enter product name"
+            required
             data-testid="product-name-input"
           />
         </div>
 
         <div class="form-row">
           <label>SKU / Item Code</label>
-          <input 
-            v-model="form.sku" 
-            type="text" 
-            disabled 
-            class="disabled-input" 
+          <input
+            v-model="form.sku"
+            type="text"
+            disabled
+            class="disabled-input"
             data-testid="product-sku-input"
           />
         </div>
@@ -144,21 +144,21 @@ const handleSubmit = () => {
         <div class="grid-2">
           <div class="form-group">
             <label>In Stock Quantity</label>
-            <input 
-              v-model="form.quantity" 
-              type="number" 
-              min="0" 
-              required 
+            <input
+              v-model="form.quantity"
+              type="number"
+              min="0"
+              required
               data-testid="product-quantity-input"
             />
           </div>
           <div class="form-group">
             <label>Unit Price ($)</label>
-            <input 
-              v-model="form.price" 
-              type="text" 
-              placeholder="0.00" 
-              required 
+            <input
+              v-model="form.price"
+              type="text"
+              placeholder="0.00"
+              required
               data-testid="product-price-input"
             />
           </div>
@@ -166,24 +166,24 @@ const handleSubmit = () => {
 
         <div class="form-group">
           <label>Product Thumbnail</label>
-          
+
           <div v-if="form.image" class="preview-container" data-testid="product-image-preview-container">
             <img :src="form.image" class="image-preview" alt="Thumbnail Preview" data-testid="product-image-preview" />
             <div class="preview-actions">
               <label class="btn-change">
                 Change
-                <input 
-                  ref="fileInputRef" 
-                  type="file" 
-                  @change="handleFileUpload" 
-                  accept="image/*" 
-                  class="hidden-input" 
+                <input
+                  ref="fileInputRef"
+                  type="file"
+                  @change="handleFileUpload"
+                  accept="image/*"
+                  class="hidden-input"
                   data-testid="product-image-change-input"
                 />
               </label>
-              <button 
-                type="button" 
-                class="btn-remove-img" 
+              <button
+                type="button"
+                class="btn-remove-img"
                 @click="removeImage"
                 data-testid="product-image-remove-button"
               >
@@ -198,28 +198,28 @@ const handleSubmit = () => {
               <path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3" />
             </svg>
             <span>Drag & drop image here, or click to browse files</span>
-            <input 
-              ref="fileInputRef" 
-              type="file" 
-              @change="handleFileUpload" 
-              accept="image/*" 
-              class="hidden-input" 
+            <input
+              ref="fileInputRef"
+              type="file"
+              @change="handleFileUpload"
+              accept="image/*"
+              class="hidden-input"
               data-testid="product-image-upload-input"
             />
           </label>
         </div>
 
         <div class="modal-footer">
-          <button 
-            type="button" 
-            class="btn-cancel" 
+          <button
+            type="button"
+            class="btn-cancel"
             @click="handleClose"
             data-testid="product-modal-cancel-button"
           >
             Cancel
           </button>
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             class="btn-save"
             data-testid="product-modal-save-button"
           >
