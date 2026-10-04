@@ -1,7 +1,5 @@
 <script setup>
-import { ref, reactive, computed } from 'vue'
-import logoImg from '../assets/logo.svg'
-import NotificationBell from '../components/NotificationBell.vue'
+import { ref, reactive, computed, inject } from 'vue'
 import { useNotificationStore } from '../stores/notifications'
 
 const tabs = [
@@ -14,16 +12,21 @@ const activeTab = ref('profile')
 const savedMessage = ref('')
 const errorMessage = ref('')
 
-const profile = reactive({
+// Inject shared search query if needed across views
+const searchQuery = inject('searchQuery', ref(''))
+
+// Inject shared user state & updaters from layout
+const profile = inject('user', reactive({
   fullName: 'Sarah Geronimo',
   email: 'sarah@vaulto.com',
   phone: '0917 000 0000',
-})
+  avatarUrl: ''
+}))
+const initial = inject('userInitial', computed(() => profile.fullName.trim().charAt(0).toUpperCase() || '?'))
+const updateAvatar = inject('updateAvatar', (url) => { profile.avatarUrl = url })
 
-// Profile picture (shows first initial when empty)
-const avatarUrl = ref('')
+// Profile picture handlers
 const fileInput = ref(null)
-const initial = computed(() => profile.fullName.trim().charAt(0).toUpperCase() || '?')
 
 const pickPicture = () => fileInput.value?.click()
 
@@ -42,13 +45,13 @@ const onPictureSelected = (event) => {
   errorMessage.value = ''
   const reader = new FileReader()
   reader.onload = () => {
-    avatarUrl.value = reader.result
+    updateAvatar(reader.result)
   }
   reader.readAsDataURL(file)
 }
 
 const removePicture = () => {
-  avatarUrl.value = ''
+  updateAvatar('')
 }
 
 const business = reactive({
@@ -112,207 +115,151 @@ const changePassword = () => {
 </script>
 
 <template>
-  <div class="dashboard-container">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="brand">
-        <img :src="logoImg" alt="Vaulto Logo" class="brand-logo" />
-      </div>
+  <div class="settings-view">
+    <!-- Tabs -->
+    <div class="tabs" data-testid="settings-tabs">
+      <button
+        v-for="tab in tabs"
+        :key="tab.key"
+        class="tab"
+        :class="{ active: activeTab === tab.key }"
+        @click="switchTab(tab.key)"
+        :data-testid="`settings-tab-${tab.key}`"
+      >
+        {{ tab.label }}
+      </button>
+    </div>
 
-      <nav class="nav-section">
-        <p class="section-title">Platform</p>
-        <router-link to="/products" class="nav-item">All Products</router-link>
-        <router-link to="/categories" class="nav-item">Categories</router-link>
-        <router-link to="/units" class="nav-item">Units</router-link>
+    <div class="settings-card">
+      <p v-if="savedMessage" class="msg success" data-testid="settings-success">{{ savedMessage }}</p>
+      <p v-if="errorMessage" class="msg error" data-testid="settings-error">{{ errorMessage }}</p>
 
-        <p class="section-title">Transaction & Records</p>
-        <router-link to="/sold" class="nav-item">Sold Inventory</router-link>
-        <router-link to="/pos" class="nav-item">POS / Sales</router-link>
-        <router-link to="/memos" class="nav-item">Memos</router-link>
-        <router-link to="/contacts" class="nav-item">Contacts</router-link>
+      <!-- Profile -->
+      <section v-if="activeTab === 'profile'">
+        <h3>Profile</h3>
+        <p class="hint">Your name and contact details shown across Vaulto.</p>
 
-        <p class="section-title">Others</p>
-        <router-link to="/settings" class="nav-item active">Settings</router-link>
-      </nav>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="main-content">
-      <!-- Topbar -->
-      <header class="topbar">
-        <div class="page-title">&lt; Settings</div>
-        <div class="user-profile">
-          <NotificationBell />
-          <div class="avatar">
-            <img v-if="avatarUrl" :src="avatarUrl" alt="Profile" class="avatar-img" />
+        <div class="picture-row">
+          <button class="avatar-large" @click="pickPicture" title="Change profile picture" data-testid="profile-avatar">
+            <img v-if="profile.avatarUrl" :src="profile.avatarUrl" alt="Profile picture" class="avatar-img" />
             <span v-else>{{ initial }}</span>
-          </div>
-          <span class="user-name">{{ profile.fullName }}</span>
-        </div>
-      </header>
-
-      <div class="content-body">
-        <!-- Tabs -->
-        <div class="tabs" data-testid="settings-tabs">
-          <button
-            v-for="tab in tabs"
-            :key="tab.key"
-            class="tab"
-            :class="{ active: activeTab === tab.key }"
-            @click="switchTab(tab.key)"
-            :data-testid="`settings-tab-${tab.key}`"
-          >
-            {{ tab.label }}
           </button>
+          <div class="picture-actions">
+            <button class="btn-upload" @click="pickPicture" data-testid="upload-picture-button">
+              {{ profile.avatarUrl ? 'Change picture' : 'Upload picture' }}
+            </button>
+            <button v-if="profile.avatarUrl" class="btn-remove" @click="removePicture" data-testid="remove-picture-button">Remove</button>
+            <small>JPG, PNG or WebP, up to 2 MB.</small>
+          </div>
+          <input
+            ref="fileInput"
+            type="file"
+            accept="image/*"
+            class="file-hidden"
+            @change="onPictureSelected"
+            data-testid="profile-picture-input"
+          />
         </div>
 
-        <div class="settings-card">
-          <p v-if="savedMessage" class="msg success" data-testid="settings-success">{{ savedMessage }}</p>
-          <p v-if="errorMessage" class="msg error" data-testid="settings-error">{{ errorMessage }}</p>
-
-          <!-- Profile -->
-          <section v-if="activeTab === 'profile'">
-            <h3>Profile</h3>
-            <p class="hint">Your name and contact details shown across Vaulto.</p>
-
-            <div class="picture-row">
-              <button class="avatar-large" @click="pickPicture" title="Change profile picture" data-testid="profile-avatar">
-                <img v-if="avatarUrl" :src="avatarUrl" alt="Profile picture" class="avatar-img" />
-                <span v-else>{{ initial }}</span>
-              </button>
-              <div class="picture-actions">
-                <button class="btn-upload" @click="pickPicture" data-testid="upload-picture-button">
-                  {{ avatarUrl ? 'Change picture' : 'Upload picture' }}
-                </button>
-                <button v-if="avatarUrl" class="btn-remove" @click="removePicture" data-testid="remove-picture-button">Remove</button>
-                <small>JPG, PNG or WebP, up to 2 MB.</small>
-              </div>
-              <input
-                ref="fileInput"
-                type="file"
-                accept="image/*"
-                class="file-hidden"
-                @change="onPictureSelected"
-                data-testid="profile-picture-input"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>Full name *</label>
-              <input v-model="profile.fullName" type="text" class="form-input" data-testid="profile-name-input" />
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Email *</label>
-                <input v-model="profile.email" type="email" class="form-input" data-testid="profile-email-input" />
-              </div>
-              <div class="form-group">
-                <label>Phone</label>
-                <input v-model="profile.phone" type="text" class="form-input" data-testid="profile-phone-input" />
-              </div>
-            </div>
-            <button class="btn-save" @click="saveProfile" data-testid="save-profile-button">Save profile</button>
-          </section>
-
-          <!-- Business -->
-          <section v-if="activeTab === 'business'">
-            <h3>Business</h3>
-            <p class="hint">Details used on receipts and stock alerts.</p>
-            <div class="form-group">
-              <label>Store name *</label>
-              <input v-model="business.storeName" type="text" class="form-input" data-testid="business-name-input" />
-            </div>
-            <div class="form-group">
-              <label>Address</label>
-              <textarea v-model="business.address" rows="2" class="form-input" placeholder="Street, city, province" data-testid="business-address-input"></textarea>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Currency</label>
-                <select v-model="business.currency" class="form-input" data-testid="business-currency-input">
-                  <option value="PHP">Philippine Peso (₱)</option>
-                  <option value="USD">US Dollar ($)</option>
-                  <option value="EUR">Euro (€)</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Low stock alert at</label>
-                <input v-model.number="business.lowStockThreshold" type="number" min="0" class="form-input" data-testid="business-threshold-input" />
-              </div>
-            </div>
-            <button class="btn-save" @click="saveBusiness" data-testid="save-business-button">Save business settings</button>
-          </section>
-
-          <!-- Notifications -->
-          <section v-if="activeTab === 'notifications'">
-            <h3>Notifications</h3>
-            <p class="hint">Choose what Vaulto alerts you about.</p>
-            <label class="toggle-row">
-              <span><strong>Low stock</strong><small>When an item drops below your alert level</small></span>
-              <input v-model="notifications.lowStock" type="checkbox" data-testid="toggle-low-stock" />
-            </label>
-            <label class="toggle-row">
-              <span><strong>New sale</strong><small>Each time a sale is completed in POS</small></span>
-              <input v-model="notifications.newSale" type="checkbox" data-testid="toggle-new-sale" />
-            </label>
-            <label class="toggle-row">
-              <span><strong>Daily summary</strong><small>Sales and stock totals at the end of the day</small></span>
-              <input v-model="notifications.dailySummary" type="checkbox" data-testid="toggle-daily-summary" />
-            </label>
-            <label class="toggle-row">
-              <span><strong>Memo reminders</strong><small>High priority memos you haven't read</small></span>
-              <input v-model="notifications.memoReminders" type="checkbox" data-testid="toggle-memo-reminders" />
-            </label>
-            <button class="btn-save" @click="saveNotifications" data-testid="save-notifications-button">Save preferences</button>
-          </section>
-
-          <!-- Security -->
-          <section v-if="activeTab === 'security'">
-            <h3>Security</h3>
-            <p class="hint">Use at least 8 characters for your new password.</p>
-            <div class="form-group">
-              <label>Current password</label>
-              <input v-model="password.current" type="password" class="form-input" data-testid="current-password-input" />
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>New password</label>
-                <input v-model="password.next" type="password" class="form-input" data-testid="new-password-input" />
-              </div>
-              <div class="form-group">
-                <label>Confirm new password</label>
-                <input v-model="password.confirm" type="password" class="form-input" data-testid="confirm-password-input" />
-              </div>
-            </div>
-            <button class="btn-save" @click="changePassword" data-testid="change-password-button">Update password</button>
-            <hr />
-            <router-link to="/login" class="logout-link" data-testid="logout-link">Log out</router-link>
-          </section>
+        <div class="form-group">
+          <label>Full name *</label>
+          <input v-model="profile.fullName" type="text" class="form-input" data-testid="profile-name-input" />
         </div>
-      </div>
-    </main>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email *</label>
+            <input v-model="profile.email" type="email" class="form-input" data-testid="profile-email-input" />
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input v-model="profile.phone" type="text" class="form-input" data-testid="profile-phone-input" />
+          </div>
+        </div>
+        <button class="btn-save" @click="saveProfile" data-testid="save-profile-button">Save profile</button>
+      </section>
+
+      <!-- Business -->
+      <section v-if="activeTab === 'business'">
+        <h3>Business</h3>
+        <p class="hint">Details used on receipts and stock alerts.</p>
+        <div class="form-group">
+          <label>Store name *</label>
+          <input v-model="business.storeName" type="text" class="form-input" data-testid="business-name-input" />
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <textarea v-model="business.address" rows="2" class="form-input" placeholder="Street, city, province" data-testid="business-address-input"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Currency</label>
+            <select v-model="business.currency" class="form-input" data-testid="business-currency-input">
+              <option value="PHP">Philippine Peso (₱)</option>
+              <option value="USD">US Dollar ($)</option>
+              <option value="EUR">Euro (€)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Low stock alert at</label>
+            <input v-model.number="business.lowStockThreshold" type="number" min="0" class="form-input" data-testid="business-threshold-input" />
+          </div>
+        </div>
+        <button class="btn-save" @click="saveBusiness" data-testid="save-business-button">Save business settings</button>
+      </section>
+
+      <!-- Notifications -->
+      <section v-if="activeTab === 'notifications'">
+        <h3>Notifications</h3>
+        <p class="hint">Choose what Vaulto alerts you about.</p>
+        <label class="toggle-row">
+          <span><strong>Low stock</strong><small>When an item drops below your alert level</small></span>
+          <input v-model="notifications.lowStock" type="checkbox" data-testid="toggle-low-stock" />
+        </label>
+        <label class="toggle-row">
+          <span><strong>New sale</strong><small>Each time a sale is completed in POS</small></span>
+          <input v-model="notifications.newSale" type="checkbox" data-testid="toggle-new-sale" />
+        </label>
+        <label class="toggle-row">
+          <span><strong>Daily summary</strong><small>Sales and stock totals at the end of the day</small></span>
+          <input v-model="notifications.dailySummary" type="checkbox" data-testid="toggle-daily-summary" />
+        </label>
+        <label class="toggle-row">
+          <span><strong>Memo reminders</strong><small>High priority memos you haven't read</small></span>
+          <input v-model="notifications.memoReminders" type="checkbox" data-testid="toggle-memo-reminders" />
+        </label>
+        <button class="btn-save" @click="saveNotifications" data-testid="save-notifications-button">Save preferences</button>
+      </section>
+
+      <!-- Security -->
+      <section v-if="activeTab === 'security'">
+        <h3>Security</h3>
+        <p class="hint">Use at least 8 characters for your new password.</p>
+        <div class="form-group">
+          <label>Current password</label>
+          <input v-model="password.current" type="password" class="form-input" data-testid="current-password-input" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>New password</label>
+            <input v-model="password.next" type="password" class="form-input" data-testid="new-password-input" />
+          </div>
+          <div class="form-group">
+            <label>Confirm new password</label>
+            <input v-model="password.confirm" type="password" class="form-input" data-testid="confirm-password-input" />
+          </div>
+        </div>
+        <button class="btn-save" @click="changePassword" data-testid="change-password-button">Update password</button>
+        <hr />
+        <router-link to="/login" class="logout-link" data-testid="logout-link">Log out</router-link>
+      </section>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.dashboard-container { display: flex; width: 100vw; height: 100vh; background: #f3f4f6; }
-
-/* Sidebar */
-.sidebar { width: 240px; background: #5d5b8d; color: #fff; padding: 20px 0; display: flex; flex-direction: column; }
-.brand { padding: 0 24px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; }
-.brand-logo { height: 48px; width: auto; max-width: 100%; display: block; object-fit: contain; }
-.nav-section { padding: 16px 12px; }
-.section-title { font-size: 0.75rem; text-transform: uppercase; color: #a5a3cf; margin: 16px 12px 8px; }
-.nav-item { display: block; padding: 10px 12px; color: #d1d0e6; text-decoration: none; border-radius: 6px; font-size: 0.9rem; }
-.nav-item.active, .nav-item:hover { background: #4c4a75; color: #fff; }
-
-/* Main Area */
-.main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
-.topbar { height: 64px; flex-shrink: 0; background: #5d5b8d; display: flex; align-items: center; justify-content: space-between; padding: 0 32px; color: #fff; }
-.page-title { font-weight: 600; font-size: 1.1rem; }
-.user-profile { display: flex; align-items: center; gap: 12px; }
-.avatar { width: 32px; height: 32px; border-radius: 50%; background: #d1d5db; color: #1e1b4b; font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.settings-view {
+  padding: 0;
+}
 
 /* Profile picture */
 .picture-row { display: flex; align-items: center; gap: 20px; margin-bottom: 24px; }
@@ -325,9 +272,7 @@ const changePassword = () => {
 .btn-upload:hover { background: #818cf8; color: #fff; }
 .btn-remove { background: #f3f4f6; border: 1px solid #d1d5db; padding: 8px 16px; border-radius: 6px; color: #b91c1c; cursor: pointer; font-weight: 600; }
 .file-hidden { display: none; }
-
-/* Content */
-.content-body { padding: 32px; }
+.avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* Tabs */
 .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid #d1d5db; }

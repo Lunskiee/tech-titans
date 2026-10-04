@@ -1,35 +1,22 @@
 <script setup>
 import { ref, computed } from 'vue'
-import NotificationBell from '../components/NotificationBell.vue'
-import logoImg from '../assets/logo.svg'
 import { useInventoryStore } from '../stores/counter'
 import { useNotificationStore } from '../stores/notifications'
 
 const store = useInventoryStore()
 const notifications = useNotificationStore()
 
-const searchQuery = ref('')
 const showModal = ref(false)
 const saleProductId = ref(null)
 const saleQuantity = ref(1)
 const formError = ref('')
 
-const money = (n) => `$${Number(n).toFixed(2)}`
+const money = (n) => `$${Number(n || 0).toFixed(2)}`
 const formatDate = (iso) =>
-  new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'
 
-// Live search by item name or SKU
-const filteredSales = computed(() => {
-  const q = searchQuery.value.toLowerCase().trim()
-  if (!q) return store.salesList
-  return store.salesList.filter(
-    s => s.name.toLowerCase().includes(q) || s.sku.toLowerCase().includes(q)
-  )
-})
-
-// Only products that still have stock can be sold
 const sellableProducts = computed(() =>
-  store.detailedProducts.filter(p => p.stockQuantity > 0)
+  (store.detailedProducts || []).filter(p => p.stockQuantity > 0)
 )
 
 const selectedProduct = computed(() =>
@@ -37,7 +24,7 @@ const selectedProduct = computed(() =>
 )
 
 const totalPreview = computed(() =>
-  selectedProduct.value ? selectedProduct.value.unitPrice * (Number(saleQuantity.value) || 0) : 0
+  selectedProduct.value ? (selectedProduct.value.unitPrice || 0) * (Number(saleQuantity.value) || 0) : 0
 )
 
 const openModal = () => {
@@ -53,21 +40,22 @@ const closeModal = () => {
 }
 
 const handleSaveSale = () => {
-  // Capture details before the stock changes
   const soldTotal = totalPreview.value
   const soldName = selectedProduct.value?.name
   const result = store.recordSale({
     productId: saleProductId.value,
     quantity: saleQuantity.value
   })
-  if (!result.ok) {
-    formError.value = result.error
+  
+  if (!result || !result.ok) {
+    formError.value = result?.error || 'Failed to record sale.'
     return
   }
+  
   notifications.notifySale(soldTotal, 1)
   if (soldName) {
     notifications.checkLowStock(
-      store.detailedProducts.map(p => ({ name: p.name, stock: p.stockQuantity })),
+      (store.detailedProducts || []).map(p => ({ name: p.name, stock: p.stockQuantity })),
       10
     )
   }
@@ -75,114 +63,68 @@ const handleSaveSale = () => {
 }
 
 const voidSale = (sale) => {
-  store.voidSale(sale.id)
+  if (sale?.id) store.voidSale(sale.id)
 }
 </script>
 
 <template>
-  <div class="dashboard-container">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="brand">
-        <img :src="logoImg" alt="Vaulto Logo" class="brand-logo" />
+  <div class="sold-view">
+    <div class="summary-grid">
+      <div class="summary-card" data-testid="summary-transactions">
+        <p class="summary-label">Transactions</p>
+        <p class="summary-value">{{ store.salesSummary?.transactions ?? 0 }}</p>
       </div>
-
-      <nav class="nav-section">
-        <p class="section-title">Platform</p>
-        <router-link to="/products" class="nav-item">All Products</router-link>
-        <router-link to="/categories" class="nav-item">Categories</router-link>
-        <router-link to="/units" class="nav-item">Units</router-link>
-
-        <p class="section-title">Transaction & Records</p>
-        <router-link to="/sold" class="nav-item active">Sold Inventory</router-link>
-        <router-link to="/pos" class="nav-item">POS / Sales</router-link>
-        <router-link to="/memos" class="nav-item">Memos</router-link>
-        <router-link to="/contacts" class="nav-item">Contacts</router-link>
-
-        <p class="section-title">Others</p>
-        <router-link to="/settings" class="nav-item">Settings</router-link>
-      </nav>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="main-content">
-      <header class="topbar">
-        <div class="page-title">&lt; Sold Inventory</div>
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search by item name or SKU..."
-          class="search-input"
-          data-testid="sold-search-input"
-        />
-        <div class="user-profile">
-          <NotificationBell />
-          <div class="avatar"></div>
-          <span class="user-name">Sarah Geronimo</span>
-        </div>
-      </header>
-
-      <div class="content-body">
-        <!-- Summary cards -->
-        <div class="summary-grid">
-          <div class="summary-card" data-testid="summary-transactions">
-            <p class="summary-label">Transactions</p>
-            <p class="summary-value">{{ store.salesSummary.transactions }}</p>
-          </div>
-          <div class="summary-card" data-testid="summary-items-sold">
-            <p class="summary-label">Items Sold</p>
-            <p class="summary-value">{{ store.salesSummary.itemsSold }}</p>
-          </div>
-          <div class="summary-card" data-testid="summary-revenue">
-            <p class="summary-label">Total Revenue</p>
-            <p class="summary-value">{{ money(store.salesSummary.revenue) }}</p>
-          </div>
-        </div>
-
-        <div class="action-bar">
-          <button class="btn-add" @click="openModal" data-testid="record-sale-button">
-            + Record Sale
-          </button>
-        </div>
-
-        <!-- Sales table -->
-        <div class="table-card">
-          <table data-testid="sold-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>SKU</th>
-                <th>Items</th>
-                <th>Qty Sold</th>
-                <th>Unit Price</th>
-                <th>Total</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="sale in filteredSales" :key="sale.id" data-testid="sale-row">
-                <td>{{ formatDate(sale.date) }}</td>
-                <td>{{ sale.sku }}</td>
-                <td class="font-medium">{{ sale.name }}</td>
-                <td>{{ sale.quantity }} {{ sale.unitAbbr }}</td>
-                <td>{{ money(sale.unitPrice) }}</td>
-                <td class="font-medium">{{ money(sale.total) }}</td>
-                <td class="action-cells">
-                  <button class="btn-delete" @click="voidSale(sale)" data-testid="sale-void-button">Void</button>
-                </td>
-              </tr>
-              <tr v-if="filteredSales.length === 0">
-                <td colspan="7" class="empty-state" data-testid="empty-sold-message">
-                  {{ store.sales.length === 0 ? 'No sales recorded yet.' : 'No sales match your search.' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="summary-card" data-testid="summary-items-sold">
+        <p class="summary-label">Items Sold</p>
+        <p class="summary-value">{{ store.salesSummary?.itemsSold ?? 0 }}</p>
       </div>
-    </main>
+      <div class="summary-card" data-testid="summary-revenue">
+        <p class="summary-label">Total Revenue</p>
+        <p class="summary-value">{{ money(store.salesSummary?.revenue) }}</p>
+      </div>
+    </div>
 
-    <!-- Record Sale Modal -->
+    <div class="action-bar">
+      <button class="btn-add" @click="openModal" data-testid="record-sale-button">
+        + Record Sale
+      </button>
+    </div>
+
+    <div class="table-card">
+      <table data-testid="sold-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>SKU</th>
+            <th>Items</th>
+            <th>Qty Sold</th>
+            <th>Unit Price</th>
+            <th>Total</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="sale in store.salesList" :key="sale.id" data-testid="sale-row">
+            <td>{{ formatDate(sale.date) }}</td>
+            <td>{{ sale.sku || 'N/A' }}</td>
+            <td class="font-medium">{{ sale.name || 'Unknown Item' }}</td>
+            <td>{{ sale.quantity }} {{ sale.unitAbbr || '' }}</td>
+            <td>{{ money(sale.unitPrice) }}</td>
+            <td class="font-medium">{{ money(sale.total) }}</td>
+            <td class="action-cells">
+              <button class="btn-delete" @click="voidSale(sale)" data-testid="sale-void-button">Void</button>
+            </td>
+          </tr>
+          <tr v-if="(store.salesList || []).length === 0">
+            <td colspan="7" class="empty-state" data-testid="empty-sold-message">
+              No sales recorded yet.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Modal -->
     <div v-if="showModal" class="modal-overlay" @click.self="closeModal" data-testid="sale-modal-overlay">
       <div class="modal-card" data-testid="sale-modal">
         <div class="modal-header">
@@ -200,7 +142,7 @@ const voidSale = (sale) => {
             <label>Product *</label>
             <select v-model="saleProductId" class="form-input" data-testid="sale-product-select">
               <option v-for="p in sellableProducts" :key="p.id" :value="p.id">
-                {{ p.name }} ({{ p.stockQuantity }} {{ p.unitAbbr }} left)
+                {{ p.name }} ({{ p.stockQuantity }} {{ p.unitAbbr || 'pcs' }} left)
               </option>
             </select>
           </div>
@@ -234,37 +176,13 @@ const voidSale = (sale) => {
 </template>
 
 <style scoped>
-.dashboard-container { display: flex; width: 100vw; height: 100vh; background: #f3f4f6; }
-
-/* Sidebar */
-.sidebar { width: 240px; background: #5d5b8d; color: #fff; padding: 20px 0; display: flex; flex-direction: column; }
-.brand { padding: 0 24px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; }
-.brand-logo { height: 48px; width: auto; max-width: 100%; display: block; object-fit: contain; }
-.nav-section { padding: 16px 12px; }
-.section-title { font-size: 0.75rem; text-transform: uppercase; color: #a5a3cf; margin: 16px 12px 8px; }
-.nav-item { display: block; padding: 10px 12px; color: #d1d0e6; text-decoration: none; border-radius: 6px; font-size: 0.9rem; }
-.nav-item.active, .nav-item:hover { background: #4c4a75; color: #fff; }
-
-/* Main Area */
-.main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
-.topbar { height: 64px; min-height: 64px; background: #5d5b8d; display: flex; align-items: center; justify-content: space-between; padding: 0 32px; color: #fff; }
-.page-title { font-weight: 600; font-size: 1.1rem; }
-.search-input { width: 400px; padding: 8px 16px; border-radius: 6px; border: none; outline: none; font-size: 0.9rem; }
-.user-profile { display: flex; align-items: center; gap: 12px; }
-.avatar { width: 32px; height: 32px; border-radius: 50%; background: #d1d5db; }
-
-/* Content */
-.content-body { padding: 32px; }
+.sold-view { padding: 0; }
 .action-bar { display: flex; gap: 16px; margin-bottom: 24px; }
 .btn-add { background: #1e1b4b; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; }
-
-/* Summary cards */
 .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
 .summary-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 20px; }
 .summary-label { margin: 0 0 6px; font-size: 0.8rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.03em; }
 .summary-value { margin: 0; font-size: 1.5rem; font-weight: 700; color: #1e1b4b; }
-
-/* Table */
 .table-card { background: #fff; border-radius: 8px; border: 1px solid #e5e7eb; overflow: hidden; }
 table { width: 100%; border-collapse: collapse; text-align: left; }
 th { background: #8b89b8; color: #fff; padding: 12px 16px; font-size: 0.85rem; }
@@ -274,8 +192,6 @@ td { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; font-size: 0.9rem; co
 .btn-delete { background: #ef4444; border: none; padding: 6px 16px; border-radius: 4px; color: #fff; cursor: pointer; font-weight: 600; }
 .btn-delete:hover { background: #dc2626; }
 .empty-state { text-align: center; color: #6b7280; padding: 32px; font-style: italic; }
-
-/* Modal */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
 .modal-card { background: #fff; border-radius: 8px; width: 420px; padding: 24px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
