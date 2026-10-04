@@ -1,7 +1,11 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import AddProductModal from '../components/AddProductModal.vue'
+import NotificationBell from '../components/NotificationBell.vue'
+import { useNotificationStore } from '../stores/notifications'
 import logoImg from '../assets/logo.svg'
+
+const notifications = useNotificationStore()
 
 const showModal = ref(false)
 const showFilterDropdown = ref(false)
@@ -18,6 +22,14 @@ const products = ref([
   { id: 2, sku: '#INV-9002', name: 'Ergonomic Mouse', category: 'Electronics', stock: 20, unit: 'pcs', price: '25.00', image: null },
   { id: 3, sku: '#INV-9003', name: 'USB-C Hub', category: 'Accessories', stock: 15, unit: 'pcs', price: '45.00', image: null },
 ])
+
+// Alert when any product is at or below the low-stock level (checks on load and after every change)
+const LOW_STOCK_LEVEL = 10
+watch(
+  products,
+  () => notifications.checkLowStock(products.value, LOW_STOCK_LEVEL),
+  { deep: true, immediate: true }
+)
 
 // Filter options: 'All' + current categories list
 const filterCategories = computed(() => ['All', ...categories.value])
@@ -127,7 +139,7 @@ const deleteProduct = (id) => {
           data-testid="product-search-input"
         />
         <div class="user-profile">
-          <span class="bell-icon">🔔</span>
+          <NotificationBell />
           <div class="avatar"></div>
           <span class="user-name">Sarah Geronimo</span>
         </div>
