@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import AuthLayout from '../components/AuthLayout.vue'
 import signupImg from '../assets/image_1.png'
 import { useAuthStore } from '../stores/auth'
+import { rememberPassword } from '../utils/credentials'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -13,11 +14,16 @@ const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const showPassword = ref(false)
+const showConfirm = ref(false)
 const errorMessage = ref('')
 const loading = ref(false)
 
 const togglePassword = () => {
   showPassword.value = !showPassword.value
+}
+
+const toggleConfirm = () => {
+  showConfirm.value = !showConfirm.value
 }
 
 // Password strength: only the 8 character minimum is required, the rest is guidance
@@ -51,22 +57,29 @@ const handleSignup = async () => {
   }
 
   loading.value = true
-  const result = await auth.register({
-    fullName: name.value,
-    email: email.value,
-    password: password.value
-  })
+  try {
+    const result = await auth.register({
+      fullName: name.value,
+      email: email.value,
+      password: password.value
+    })
+    if (!result.ok) {
+      errorMessage.value = result.error
+      return
+    }
 
-  if (!result.ok) {
+    // Ask the browser's password manager to save the password right away
+    rememberPassword({ email: email.value, password: password.value, name: name.value })
+
+    // The account is already saved. Sign in right away so the new user lands inside the app
+    const login = await auth.login(email.value, password.value)
+    if (login.ok) router.push('/products')
+    else router.push({ path: '/login', query: { email: email.value } })
+  } catch {
+    errorMessage.value = 'Something went wrong. Please try again.'
+  } finally {
     loading.value = false
-    errorMessage.value = result.error
-    return
   }
-
-  // Account created: sign in right away so the new user lands inside the app
-  const login = await auth.login(email.value, password.value)
-  loading.value = false
-  router.push(login.ok ? '/products' : '/login')
 }
 </script>
 
@@ -157,16 +170,36 @@ const handleSignup = async () => {
 
         <div class="input-group">
           <label for="confirmPassword">Confirm Password</label>
-          <input 
-            id="confirmPassword" 
-            v-model="confirmPassword" 
-            :type="showPassword ? 'text' : 'password'" 
-            placeholder="Re-enter Password" 
-            autocomplete="new-password"
-            :class="{ invalid: passwordsMismatch }"
-            required 
-            data-testid="signup-confirm-password-input"
-          />
+          <div class="password-wrapper">
+            <input
+              id="confirmPassword"
+              v-model="confirmPassword"
+              :type="showConfirm ? 'text' : 'password'"
+              placeholder="Re-enter Password"
+              autocomplete="new-password"
+              :class="{ invalid: passwordsMismatch }"
+              required
+              data-testid="signup-confirm-password-input"
+            />
+            <button
+              type="button"
+              class="eye-button"
+              @click="toggleConfirm"
+              :aria-label="showConfirm ? 'Hide password' : 'Show password'"
+              data-testid="signup-toggle-confirm-button"
+            >
+              <svg v-if="showConfirm" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                <path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                <line x1="2" x2="22" y1="2" y2="22" />
+              </svg>
+            </button>
+          </div>
           <small v-if="passwordsMismatch" class="field-error" data-testid="signup-mismatch">Passwords do not match.</small>
         </div>
 

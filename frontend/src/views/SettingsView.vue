@@ -3,9 +3,12 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../stores/notifications'
 import { useAuthStore } from '../stores/auth'
+import { useSettingsStore } from '../stores/settings'
+import { rememberPassword } from '../utils/credentials'
 
 const router = useRouter()
 const auth = useAuthStore()
+const settings = useSettingsStore()
 
 const tabs = [
   { key: 'profile', label: 'Profile' },
@@ -100,7 +103,7 @@ const removePicture = () => {
 const business = reactive({
   storeName: 'Vaulto Store',
   address: '',
-  currency: 'PHP',
+  currency: settings.business.currency, // shared: drives the money format in Products, POS and Sold Inventory
   lowStockThreshold: 10,
 })
 
@@ -108,6 +111,7 @@ const business = reactive({
 const notifications = useNotificationStore().preferences
 
 const password = reactive({ current: '', next: '', confirm: '' })
+const show = reactive({ current: false, next: false, confirm: false }) // show/hide for each password field
 
 const flash = (msg) => {
   errorMessage.value = ''
@@ -140,6 +144,7 @@ const saveBusiness = () => {
     errorMessage.value = 'Store name is required.'
     return
   }
+  settings.update({ currency: business.currency })
   flash('Business settings saved.')
 }
 
@@ -163,8 +168,14 @@ const changePassword = async () => {
     errorMessage.value = result.error
     return
   }
-  password.current = password.next = password.confirm = ''
+  // The new password is now the current one, so it replaces the old one in that field
+  const newPassword = password.next
+  password.current = newPassword
+  password.next = password.confirm = ''
   flash('Password updated.')
+
+  // Ask the browser's password manager (Google, Edge) to save the new password right away
+  rememberPassword({ email: auth.user?.email, password: newPassword, name: auth.user?.fullName })
 }
 
 const handleLogout = () => {
@@ -293,21 +304,87 @@ const handleLogout = () => {
       <section v-if="activeTab === 'security'">
         <h3>Security</h3>
         <p class="hint">Use at least 8 characters for your new password.</p>
-        <div class="form-group">
-          <label>Current password</label>
-          <input v-model="password.current" type="password" class="form-input" data-testid="current-password-input" />
-        </div>
-        <div class="form-row">
+
+        <form @submit.prevent="changePassword">
+          <!-- Lets the browser's password manager fill the right saved password -->
+          <input
+            type="text"
+            :value="auth.user?.email"
+            autocomplete="username"
+            class="sr-only"
+            tabindex="-1"
+            aria-hidden="true"
+            readonly
+          />
+
           <div class="form-group">
-            <label>New password</label>
-            <input v-model="password.next" type="password" class="form-input" data-testid="new-password-input" />
+            <label for="current-password">Current password</label>
+            <div class="pw-field">
+              <input
+                id="current-password"
+                v-model="password.current"
+                :type="show.current ? 'text' : 'password'"
+                autocomplete="current-password"
+                class="form-input"
+                data-testid="current-password-input"
+              />
+              <button
+                type="button"
+                class="pw-toggle"
+                @click="show.current = !show.current"
+                :aria-label="show.current ? 'Hide current password' : 'Show current password'"
+                data-testid="toggle-current-password-button"
+              >{{ show.current ? 'Hide' : 'Show' }}</button>
+            </div>
+            <small class="field-note">For your safety your saved password is never displayed. Type it to confirm it's you.</small>
           </div>
-          <div class="form-group">
-            <label>Confirm new password</label>
-            <input v-model="password.confirm" type="password" class="form-input" data-testid="confirm-password-input" />
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="new-password">New password</label>
+              <div class="pw-field">
+                <input
+                  id="new-password"
+                  v-model="password.next"
+                  :type="show.next ? 'text' : 'password'"
+                  autocomplete="new-password"
+                  class="form-input"
+                  data-testid="new-password-input"
+                />
+                <button
+                  type="button"
+                  class="pw-toggle"
+                  @click="show.next = !show.next"
+                  :aria-label="show.next ? 'Hide new password' : 'Show new password'"
+                  data-testid="toggle-new-password-button"
+                >{{ show.next ? 'Hide' : 'Show' }}</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="confirm-password">Confirm new password</label>
+              <div class="pw-field">
+                <input
+                  id="confirm-password"
+                  v-model="password.confirm"
+                  :type="show.confirm ? 'text' : 'password'"
+                  autocomplete="new-password"
+                  class="form-input"
+                  data-testid="confirm-password-input"
+                />
+                <button
+                  type="button"
+                  class="pw-toggle"
+                  @click="show.confirm = !show.confirm"
+                  :aria-label="show.confirm ? 'Hide confirmation' : 'Show confirmation'"
+                  data-testid="toggle-confirm-password-button"
+                >{{ show.confirm ? 'Hide' : 'Show' }}</button>
+              </div>
+            </div>
           </div>
-        </div>
-        <button class="btn-save" @click="changePassword" data-testid="change-password-button">Update password</button>
+
+          <button type="submit" class="btn-save" data-testid="change-password-button">Update password</button>
+        </form>
+
         <hr />
         <a href="#" class="logout-link" @click.prevent="handleLogout" data-testid="logout-link">Log out</a>
       </section>
@@ -356,6 +433,13 @@ const handleLogout = () => {
 .form-input:focus { border-color: #5d5b8d; }
 .btn-save { background: #1e1b4b; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 8px; }
 .btn-save:hover { background: #2e2a6b; }
+
+/* Password fields */
+.pw-field { position: relative; display: flex; }
+.pw-field .form-input { width: 100%; box-sizing: border-box; padding-right: 64px; }
+.pw-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #4338ca; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
+.field-note { font-size: 0.8rem; color: #6b7280; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); opacity: 0; }
 
 /* Toggles */
 .toggle-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid #e5e7eb; cursor: pointer; }

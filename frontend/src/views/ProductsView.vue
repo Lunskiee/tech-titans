@@ -2,8 +2,10 @@
 import { ref, computed, inject, onMounted } from 'vue'
 import AddProductModal from '../components/AddProductModal.vue'
 import { useInventoryStore, LOW_STOCK_LEVEL } from '../stores/inventory'
+import { useSettingsStore } from '../stores/settings'
 
 const store = useInventoryStore()
+const settings = useSettingsStore()
 
 const showModal = ref(false)
 const showFilterDropdown = ref(false)
@@ -99,6 +101,7 @@ const handleSaveProduct = (productData) => {
     return
   }
 
+  // Strip any currency symbol the modal sends ($, ₱, €) before saving the number
   const price = Math.max(0, Number(String(productData.price).replace(/[^0-9.]/g, '')) || 0)
   const stock = Math.max(0, Number(productData.quantity) || 0)
 
@@ -192,7 +195,7 @@ const deleteProduct = (id) => {
               <span v-if="item.stock <= 0" class="stock-tag out">Out</span>
               <span v-else-if="item.stock <= LOW_STOCK_LEVEL" class="stock-tag low">Low</span>
             </td>
-            <td>${{ item.price }}</td>
+            <td data-testid="product-price">{{ settings.format(item.price) }}</td>
             <td class="action-cells">
               <button class="btn-edit" @click="openEditModal(item)" data-testid="product-edit-button">Edit</button>
               <button class="btn-delete" @click="deleteProduct(item.id)" data-testid="product-delete-button">Delete</button>

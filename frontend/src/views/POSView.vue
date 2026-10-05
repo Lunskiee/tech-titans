@@ -2,9 +2,11 @@
 import { ref, computed } from 'vue'
 import { useInventoryStore } from '../stores/inventory'
 import { useNotificationStore } from '../stores/notifications'
+import { useSettingsStore } from '../stores/settings'
 
 const store = useInventoryStore()
 const notifications = useNotificationStore()
+const settings = useSettingsStore()
 
 const searchQuery = ref('')
 const categoryFilter = ref('all')
@@ -13,7 +15,7 @@ const cashReceived = ref('')
 const checkoutError = ref('')
 const receipt = ref(null)
 
-const money = (n) => `$${Number(n).toFixed(2)}`
+const money = (n) => settings.format(n)
 
 // ---------- Product catalog (left side) ----------
 const catalog = computed(() => {
@@ -167,6 +169,12 @@ const closeReceipt = () => { receipt.value = null }
             @click="addToCart(p)"
             data-testid="pos-product-card"
           >
+            <!-- Product image from All Products (first letter if there is none) -->
+            <span class="product-image" data-testid="pos-product-image">
+              <img v-if="p.image" :src="p.image" :alt="p.name" />
+              <span v-else class="product-initial">{{ p.name.charAt(0).toUpperCase() }}</span>
+            </span>
+
             <span class="product-name">{{ p.name }}</span>
             <span class="product-sku">{{ p.sku }} · {{ p.categoryName }}</span>
             <span class="product-price">{{ money(p.unitPrice) }} <small>/ {{ p.unitAbbr }}</small></span>
@@ -374,6 +382,34 @@ const closeReceipt = () => { receipt.value = null }
   opacity: 0.55; 
   cursor: not-allowed; 
 }
+
+/* Product image on the card */
+.product-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 110px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  background: #e0e7ff;
+  overflow: hidden;
+}
+.product-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.product-initial {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #5d5b8d;
+}
+.out-of-stock .product-image {
+  filter: grayscale(1);
+}
+
 .product-name { 
   font-weight: 600; 
   color: #111827; 

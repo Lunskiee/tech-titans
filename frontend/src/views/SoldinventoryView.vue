@@ -1,9 +1,12 @@
 <script setup>
 import { useInventoryStore } from '../stores/inventory'
+import { useSettingsStore } from '../stores/settings'
 
 const store = useInventoryStore()
+const settings = useSettingsStore()
 
-const money = (n) => `$${Number(n || 0).toFixed(2)}`
+// Uses the currency chosen in Settings > Business
+const money = (n) => settings.format(n)
 const formatDate = (iso) =>
   iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'
 

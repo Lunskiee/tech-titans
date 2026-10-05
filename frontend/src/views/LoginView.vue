@@ -1,17 +1,20 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import AuthLayout from '../components/AuthLayout.vue'
 import warehouseImg from '../assets/image_0.png'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
-const email = ref('')
+// After a password reset the user arrives here with their email already filled in
+const email = ref(typeof route.query.email === 'string' ? route.query.email : '')
 const password = ref('')
 const showPassword = ref(false)
 const errorMessage = ref('')
+const notice = ref(route.query.reset === '1' ? 'Password updated. Log in with your new password.' : '')
 const loading = ref(false)
 
 const togglePassword = () => {
@@ -20,15 +23,20 @@ const togglePassword = () => {
 
 const handleLogin = async () => {
   errorMessage.value = ''
+  notice.value = ''
   loading.value = true
-  const result = await auth.login(email.value, password.value)
-  loading.value = false
-
-  if (!result.ok) {
-    errorMessage.value = result.error
-    return
+  try {
+    const result = await auth.login(email.value, password.value)
+    if (!result.ok) {
+      errorMessage.value = result.error
+      return
+    }
+    router.push('/products')
+  } catch {
+    errorMessage.value = 'Something went wrong. Please try again.'
+  } finally {
+    loading.value = false
   }
-  router.push('/products')
 }
 </script>
 
@@ -45,6 +53,7 @@ const handleLogin = async () => {
       </div>
 
       <form @submit.prevent="handleLogin" class="auth-form" data-testid="login-form">
+        <p v-if="notice" class="form-notice" role="status" data-testid="login-notice">{{ notice }}</p>
         <p v-if="errorMessage" class="form-error" role="alert" data-testid="login-error">{{ errorMessage }}</p>
 
         <div class="input-group">
@@ -192,6 +201,17 @@ const handleLogin = async () => {
   color: #b91c1c;
   background-color: #fef2f2;
   border: 1px solid #fca5a5;
+  border-radius: 8px;
+}
+
+.form-notice {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #166534;
+  background-color: #f0fdf4;
+  border: 1px solid #86efac;
   border-radius: 8px;
 }
 
