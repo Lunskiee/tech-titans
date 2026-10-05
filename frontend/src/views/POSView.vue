@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { useInventoryStore } from '../stores/counter'
+import { useInventoryStore } from '../stores/inventory'
 import { useNotificationStore } from '../stores/notifications'
 
 const store = useInventoryStore()

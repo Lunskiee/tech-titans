@@ -1,181 +1,443 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed } from 'vue'
 import AuthLayout from '../components/AuthLayout.vue'
-import illustrationImg from '../assets/image_0.png'
+import warehouseImg from '../assets/image_0.png'
+import { useAuthStore } from '../stores/auth'
 
-const router = useRouter()
+const auth = useAuthStore()
 
+const step = ref('email') // 'email' | 'reset' | 'done'
 const email = ref('')
+const code = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
-const isLoading = ref(false)
+const showPassword = ref(false)
+const errorMessage = ref('')
+const loading = ref(false)
 
-const handleResetPassword = async () => {
+// Demo only: no email server, so the code is shown on screen
+const demoCode = ref('')
+const demoMinutes = ref(10)
+
+const passwordsMismatch = computed(
+  () => confirmPassword.value !== '' && confirmPassword.value !== newPassword.value
+)
+
+const togglePassword = () => {
+  showPassword.value = !showPassword.value
+}
+
+const sendCode = async () => {
+  errorMessage.value = ''
+  loading.value = true
+  const result = await auth.requestPasswordReset(email.value)
+  loading.value = false
+
+  if (!result.ok) {
+    errorMessage.value = result.error
+    return
+  }
+  demoCode.value = result.code
+  demoMinutes.value = result.minutes
+  code.value = ''
+  step.value = 'reset'
+}
+
+const submitReset = async () => {
+  errorMessage.value = ''
+
+  if (newPassword.value.length < 8) {
+    errorMessage.value = 'New password must be at least 8 characters.'
+    return
+  }
   if (newPassword.value !== confirmPassword.value) {
-    alert('Passwords do not match!')
+    errorMessage.value = 'Passwords do not match.'
     return
   }
 
-  isLoading.value = true
-  try {
-    alert('Password updated successfully!')
-    router.push('/login')
-  } catch (error) {
-    alert('Failed to reset password. Please try again.')
-  } finally {
-    isLoading.value = false
+  loading.value = true
+  const result = await auth.resetPassword(email.value, code.value, newPassword.value)
+  loading.value = false
+
+  if (!result.ok) {
+    errorMessage.value = result.error
+    return
   }
+  step.value = 'done'
+}
+
+const useDifferentEmail = () => {
+  errorMessage.value = ''
+  demoCode.value = ''
+  newPassword.value = ''
+  confirmPassword.value = ''
+  step.value = 'email'
 }
 </script>
 
 <template>
   <AuthLayout>
     <template #illustration>
-      <img :src="illustrationImg" alt="Vaulto Inventory Illustration" />
+      <img :src="warehouseImg" alt="Warehouse Illustration" class="illustration-image" />
     </template>
 
-    <div class="auth-card">
-      <h2 class="auth-title">Reset Password</h2>
-      <p class="auth-subtitle">
-        Enter your registered email and choose a new password for your account.
-      </p>
-
-      <form @submit.prevent="handleResetPassword" class="auth-form">
-        <div class="form-group">
-          <label for="email">Email</label>
-          <input
-            id="email"
-            v-model="email"
-            type="email"
-            required
-            placeholder="Enter Email"
-            class="form-input"
-          />
+    <template #default>
+      <!-- Step 1: enter email -->
+      <template v-if="step === 'email'">
+        <div class="page-header">
+          <h2 class="title">Forgot Password?</h2>
+          <p class="subtitle">Enter your email and we'll help you reset it</p>
         </div>
 
-        <div class="form-group">
-          <label for="newPassword">New Password</label>
-          <input
-            id="newPassword"
-            v-model="newPassword"
-            type="password"
-            required
-            placeholder="Enter New Password"
-            class="form-input"
-          />
+        <form @submit.prevent="sendCode" class="auth-form" data-testid="forgot-form">
+          <p v-if="errorMessage" class="form-error" role="alert" data-testid="forgot-error">{{ errorMessage }}</p>
+
+          <div class="input-group">
+            <label for="email">Email</label>
+            <input
+              id="email"
+              v-model="email"
+              type="email"
+              placeholder="Enter Email"
+              autocomplete="email"
+              required
+              data-testid="forgot-email-input"
+            />
+          </div>
+
+          <button type="submit" class="auth-button" :disabled="loading" data-testid="forgot-submit-button">
+            {{ loading ? 'Checking...' : 'Send Reset Code' }}
+          </button>
+        </form>
+      </template>
+
+      <!-- Step 2: enter code and new password -->
+      <template v-else-if="step === 'reset'">
+        <div class="page-header">
+          <h2 class="title">Reset Password</h2>
+          <p class="subtitle">Enter the code and choose a new password</p>
         </div>
 
-        <div class="form-group">
-          <label for="confirmPassword">Confirm Password</label>
-          <input
-            id="confirmPassword"
-            v-model="confirmPassword"
-            type="password"
-            required
-            placeholder="Confirm New Password"
-            class="form-input"
-          />
+        <div class="demo-box" data-testid="forgot-demo-code">
+          <strong>Demo mode:</strong> no email is sent. Your reset code is
+          <span class="demo-code">{{ demoCode }}</span>
+          <small>It works for {{ demoMinutes }} minutes.</small>
         </div>
 
-        <button type="submit" :disabled="isLoading" class="btn-primary">
-          {{ isLoading ? 'Resetting...' : 'Reset Password' }}
-        </button>
-      </form>
+        <form @submit.prevent="submitReset" class="auth-form" data-testid="reset-form">
+          <p v-if="errorMessage" class="form-error" role="alert" data-testid="reset-error">{{ errorMessage }}</p>
 
-      <div class="auth-footer">
-        <span>Back to </span>
-        <router-link to="/login" class="auth-link">Sign In here</router-link>
+          <div class="input-group">
+            <label for="code">Reset Code</label>
+            <input
+              id="code"
+              v-model="code"
+              type="text"
+              inputmode="numeric"
+              maxlength="6"
+              placeholder="6-digit code"
+              autocomplete="one-time-code"
+              required
+              data-testid="reset-code-input"
+            />
+          </div>
+
+          <div class="input-group">
+            <label for="newPassword">New Password</label>
+            <div class="password-wrapper">
+              <input
+                id="newPassword"
+                v-model="newPassword"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="At least 8 characters"
+                autocomplete="new-password"
+                required
+                data-testid="reset-password-input"
+              />
+              <button
+                type="button"
+                class="eye-button"
+                @click="togglePassword"
+                :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                data-testid="reset-toggle-password-button"
+              >
+                <svg v-if="showPassword" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                  <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                  <path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                  <line x1="2" x2="22" y1="2" y2="22" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label for="confirmPassword">Confirm New Password</label>
+            <input
+              id="confirmPassword"
+              v-model="confirmPassword"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="Re-enter Password"
+              autocomplete="new-password"
+              :class="{ invalid: passwordsMismatch }"
+              required
+              data-testid="reset-confirm-input"
+            />
+            <small v-if="passwordsMismatch" class="field-error">Passwords do not match.</small>
+          </div>
+
+          <button type="submit" class="auth-button" :disabled="loading" data-testid="reset-submit-button">
+            {{ loading ? 'Updating...' : 'Reset Password' }}
+          </button>
+
+          <div class="link-row">
+            <button type="button" class="text-link" @click="sendCode" :disabled="loading" data-testid="reset-resend-button">Send a new code</button>
+            <button type="button" class="text-link" @click="useDifferentEmail" data-testid="reset-change-email-button">Use a different email</button>
+          </div>
+        </form>
+      </template>
+
+      <!-- Step 3: done -->
+      <template v-else>
+        <div class="page-header">
+          <h2 class="title">Password Updated</h2>
+          <p class="subtitle">You can now log in with your new password.</p>
+        </div>
+
+        <router-link to="/login" class="auth-button as-link" data-testid="reset-login-link">Back to Log In</router-link>
+      </template>
+
+      <div v-if="step !== 'done'" class="footer-link">
+        Remembered it?
+        <router-link to="/login" data-testid="forgot-login-link">Back to Log In</router-link>
       </div>
-    </div>
+    </template>
   </AuthLayout>
 </template>
 
 <style scoped>
-@import '../assets/auth-styles.css';
+@import url('https://fonts.googleapis.com/css2?family=Commissioner:wght@400;500;600;700&display=swap');
 
-.auth-card {
-  width: 100%;
+* {
+  font-family: 'Commissioner', sans-serif;
 }
 
-.auth-title {
-  font-size: 2rem;
+:deep(.illustration-container),
+:deep(.illustration-wrapper),
+:deep([class*="illustration"]) {
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100% !important;
+}
+
+.illustration-image {
+  width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  object-fit: cover !important;
+}
+
+.page-header {
+  text-align: left;
+  margin-top: -16px;
+  margin-bottom: 22px;
+}
+
+.title {
+  font-size: 32px;
   font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 0.25rem;
+  color: #1F2344;
+  margin: 0 0 4px 0;
+  line-height: 1.1;
 }
 
-.auth-subtitle {
-  font-size: 0.875rem;
+.subtitle {
+  font-size: 14px;
+  font-weight: 400;
   color: #6b7280;
-  margin-bottom: 1.5rem;
+  margin: 0;
 }
 
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 12px;
 }
 
-.form-group {
+.form-error {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #b91c1c;
+  background-color: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+}
+
+.demo-box {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #1e3a8a;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.demo-code {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: #1F2344;
+}
+
+.demo-box small {
+  flex-basis: 100%;
+  color: #475569;
+}
+
+.input-group {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 4px;
 }
 
-.form-group label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #374151;
+.input-group label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1F2344;
 }
 
-.form-input {
+.password-wrapper {
+  position: relative;
   width: 100%;
-  padding: 0.75rem 1rem;
-  background-color: #f3f4f6;
-  border: 1px solid transparent;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+}
+
+.input-group input {
+  width: 100%;
+  height: 44px;
+  padding: 0 42px 0 16px;
+  font-size: 14px;
+  color: #1F2344;
+  border: 1px solid #cdd1dc;
+  border-radius: 10px;
+  background-color: #f2f4f7;
+  box-sizing: border-box;
   outline: none;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
-.form-input:focus {
-  background-color: #ffffff;
+.input-group input::placeholder {
+  color: #a0aec0;
+}
+
+.input-group input:focus {
   border-color: #656ba1;
+  background-color: #ffffff;
 }
 
-.btn-primary {
+.input-group input.invalid {
+  border-color: #ef4444;
+}
+
+.field-error {
+  font-size: 12px;
+  font-weight: 500;
+  color: #b91c1c;
+}
+
+.eye-button {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #718096;
+  transition: color 0.2s ease;
+}
+
+.eye-button:hover {
+  color: #1F2344;
+}
+
+.auth-button {
   width: 100%;
-  padding: 0.75rem;
+  height: 48px;
+  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 600;
   background-color: #656ba1;
   color: #ffffff;
-  font-weight: 600;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 8px;
   cursor: pointer;
-  margin-top: 0.5rem;
   transition: background-color 0.2s ease;
 }
 
-.btn-primary:hover {
-  background-color: #525785;
+.auth-button.as-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-sizing: border-box;
 }
 
-.auth-footer {
-  margin-top: 1.5rem;
+.auth-button:hover:not(:disabled) {
+  background-color: #54598a;
+}
+
+.auth-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.link-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.text-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4c51bf;
+  cursor: pointer;
+}
+
+.text-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.footer-link {
   text-align: center;
-  font-size: 0.875rem;
-  color: #6b7280;
+  margin-top: 20px;
+  font-size: 13px;
+  color: #a0aec0;
 }
 
-.auth-link {
-  color: #656ba1;
+.footer-link a {
+  color: #4c51bf;
   font-weight: 600;
   text-decoration: none;
-}
-
-.auth-link:hover {
-  text-decoration: underline;
 }
 </style>

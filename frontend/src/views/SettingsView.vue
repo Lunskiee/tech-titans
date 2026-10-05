@@ -1,6 +1,11 @@
 <script setup>
-import { ref, reactive, computed, inject } from 'vue'
+import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../stores/notifications'
+import { useAuthStore } from '../stores/auth'
+
+const router = useRouter()
+const auth = useAuthStore()
 
 const tabs = [
   { key: 'profile', label: 'Profile' },
@@ -12,23 +17,55 @@ const activeTab = ref('profile')
 const savedMessage = ref('')
 const errorMessage = ref('')
 
-// Inject shared search query if needed across views
-const searchQuery = inject('searchQuery', ref(''))
+// Profile form starts from the account you signed up with / logged in as
+const profile = reactive({
+  fullName: auth.user?.fullName || '',
+  email: auth.user?.email || '',
+  phone: auth.user?.phone || '',
+})
 
-// Inject shared user state & updaters from layout
-const profile = inject('user', reactive({
-  fullName: 'Sarah Geronimo',
-  email: 'sarah@vaulto.com',
-  phone: '0917 000 0000',
-  avatarUrl: ''
-}))
-const initial = inject('userInitial', computed(() => profile.fullName.trim().charAt(0).toUpperCase() || '?'))
-const updateAvatar = inject('updateAvatar', (url) => { profile.avatarUrl = url })
+// Live preview of the initial while typing the name
+const initialPreview = () => profile.fullName.trim().charAt(0).toUpperCase() || '?'
 
-// Profile picture handlers
+// ---------- Profile picture ----------
 const fileInput = ref(null)
 
 const pickPicture = () => fileInput.value?.click()
+
+// Shrink to a small square so it fits in browser storage
+const resizeImage = (dataUrl, size = 256) =>
+  new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = size
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, size, size)
+      const scale = Math.max(size / img.width, size / img.height)
+      const w = img.width * scale
+      const h = img.height * scale
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h)
+      resolve(canvas.toDataURL('image/jpeg', 0.85))
+    }
+    img.onerror = reject
+    img.src = dataUrl
+  })
+
+// Saves only the picture, using the details already stored on the account
+const saveAvatar = (url) => {
+  const result = auth.updateProfile({
+    fullName: auth.user.fullName,
+    email: auth.user.email,
+    phone: auth.user.phone,
+    avatarUrl: url,
+  })
+  if (!result.ok) {
+    errorMessage.value = result.error
+    return false
+  }
+  return true
+}
 
 const onPictureSelected = (event) => {
   const file = event.target.files[0]
@@ -38,22 +75,28 @@ const onPictureSelected = (event) => {
     errorMessage.value = 'Please choose an image file (JPG, PNG, or WebP).'
     return
   }
-  if (file.size > 2 * 1024 * 1024) {
-    errorMessage.value = 'Image must be 2 MB or smaller.'
+  if (file.size > 5 * 1024 * 1024) {
+    errorMessage.value = 'Image must be 5 MB or smaller.'
     return
   }
   errorMessage.value = ''
   const reader = new FileReader()
-  reader.onload = () => {
-    updateAvatar(reader.result)
+  reader.onload = async () => {
+    try {
+      const small = await resizeImage(reader.result)
+      if (saveAvatar(small)) flash('Profile picture updated.')
+    } catch {
+      errorMessage.value = 'That image could not be read. Try a different one.'
+    }
   }
   reader.readAsDataURL(file)
 }
 
 const removePicture = () => {
-  updateAvatar('')
+  if (saveAvatar('')) flash('Profile picture removed.')
 }
 
+// ---------- Other settings ----------
 const business = reactive({
   storeName: 'Vaulto Store',
   address: '',
@@ -79,8 +122,14 @@ const switchTab = (key) => {
 }
 
 const saveProfile = () => {
-  if (!profile.fullName.trim() || !profile.email.trim()) {
-    errorMessage.value = 'Name and email are required.'
+  const result = auth.updateProfile({
+    fullName: profile.fullName,
+    email: profile.email,
+    phone: profile.phone,
+    avatarUrl: auth.user?.avatarUrl || '',
+  })
+  if (!result.ok) {
+    errorMessage.value = result.error
     return
   }
   flash('Profile saved.')
@@ -96,7 +145,7 @@ const saveBusiness = () => {
 
 const saveNotifications = () => flash('Notification preferences saved.')
 
-const changePassword = () => {
+const changePassword = async () => {
   if (!password.current || !password.next || !password.confirm) {
     errorMessage.value = 'Fill in all password fields.'
     return
@@ -109,8 +158,18 @@ const changePassword = () => {
     errorMessage.value = 'New password and confirmation do not match.'
     return
   }
+  const result = await auth.changePassword(password.current, password.next)
+  if (!result.ok) {
+    errorMessage.value = result.error
+    return
+  }
   password.current = password.next = password.confirm = ''
   flash('Password updated.')
+}
+
+const handleLogout = () => {
+  auth.logout()
+  router.push('/login')
 }
 </script>
 
@@ -141,15 +200,15 @@ const changePassword = () => {
 
         <div class="picture-row">
           <button class="avatar-large" @click="pickPicture" title="Change profile picture" data-testid="profile-avatar">
-            <img v-if="profile.avatarUrl" :src="profile.avatarUrl" alt="Profile picture" class="avatar-img" />
-            <span v-else>{{ initial }}</span>
+            <img v-if="auth.user?.avatarUrl" :src="auth.user.avatarUrl" alt="Profile picture" class="avatar-img" />
+            <span v-else>{{ initialPreview() }}</span>
           </button>
           <div class="picture-actions">
             <button class="btn-upload" @click="pickPicture" data-testid="upload-picture-button">
-              {{ profile.avatarUrl ? 'Change picture' : 'Upload picture' }}
+              {{ auth.user?.avatarUrl ? 'Change picture' : 'Upload picture' }}
             </button>
-            <button v-if="profile.avatarUrl" class="btn-remove" @click="removePicture" data-testid="remove-picture-button">Remove</button>
-            <small>JPG, PNG or WebP, up to 2 MB.</small>
+            <button v-if="auth.user?.avatarUrl" class="btn-remove" @click="removePicture" data-testid="remove-picture-button">Remove</button>
+            <small>JPG, PNG or WebP. It's cropped to a square automatically.</small>
           </div>
           <input
             ref="fileInput"
@@ -250,7 +309,7 @@ const changePassword = () => {
         </div>
         <button class="btn-save" @click="changePassword" data-testid="change-password-button">Update password</button>
         <hr />
-        <router-link to="/login" class="logout-link" data-testid="logout-link">Log out</router-link>
+        <a href="#" class="logout-link" @click.prevent="handleLogout" data-testid="logout-link">Log out</a>
       </section>
     </div>
   </div>
@@ -307,6 +366,6 @@ const changePassword = () => {
 .toggle-row + .btn-save { margin-top: 22px; }
 
 hr { border: none; border-top: 1px solid #e5e7eb; margin: 28px 0 18px; }
-.logout-link { color: #ef4444; font-weight: 600; font-size: 0.9rem; text-decoration: none; }
+.logout-link { color: #ef4444; font-weight: 600; font-size: 0.9rem; text-decoration: none; cursor: pointer; }
 .logout-link:hover { text-decoration: underline; }
 </style>

@@ -189,32 +189,6 @@ const deleteUnit = (id) => {
 // Sales
 const nextOrderId = () => Math.max(0, ...state.sales.map(s => s.orderId || 0)) + 1
 
-const recordSale = ({ productId, quantity, orderId = null }) => {
-  const product = state.products.find(p => p.id === productId)
-  const qty = Number(quantity)
-  if (!product) return fail('Please select a product.')
-  if (!qty || qty <= 0) return fail('Quantity must be greater than 0.')
-  if (qty > product.stockQuantity) return fail(`Only ${product.stockQuantity} in stock.`)
-
-  const unit = state.units.find(u => u.id === product.unitId)
-  product.stockQuantity -= qty
-
-  // Snapshot name/price so history never changes if the product is edited later
-  state.sales.push({
-    id: nextId(state.sales),
-    orderId,
-    date: new Date().toISOString(),
-    productId: product.id,
-    sku: product.sku,
-    name: product.name,
-    unitAbbr: unit ? unit.abbreviation : '?',
-    quantity: qty,
-    unitPrice: product.unitPrice,
-    total: Math.round(qty * product.unitPrice * 100) / 100
-  })
-  return ok()
-}
-
 // Removes a sale and puts the stock back (if the product still exists)
 const voidSale = (id) => {
   const sale = state.sales.find(s => s.id === id)
@@ -244,12 +218,32 @@ const checkout = (items) => {
   }
 
   const orderId = nextOrderId()
-  let total = 0
+  let orderTotal = 0
+
   for (const [productId, quantity] of wanted) {
-    recordSale({ productId, quantity, orderId })
-    total += state.sales[state.sales.length - 1].total
+    const product = state.products.find(p => p.id === productId)
+    const unit = state.units.find(u => u.id === product.unitId)
+    const lineTotal = Math.round(quantity * product.unitPrice * 100) / 100
+
+    product.stockQuantity -= quantity
+
+    state.sales.push({
+      id: nextId(state.sales),
+      orderId,
+      date: new Date().toISOString(),
+      productId: product.id,
+      sku: product.sku,
+      name: product.name,
+      unitAbbr: unit ? unit.abbreviation : '?',
+      quantity,
+      unitPrice: product.unitPrice,
+      total: lineTotal
+    })
+
+    orderTotal += lineTotal
   }
-  return ok({ orderId, total: Math.round(total * 100) / 100 })
+
+  return ok({ orderId, total: Math.round(orderTotal * 100) / 100 })
 }
 
 // ---------- One shared store object ----------
@@ -262,7 +256,7 @@ const store = reactive({
   addProduct, updateProduct, deleteProduct,
   addCategory, updateCategory, deleteCategory,
   addUnit, updateUnit, deleteUnit,
-  recordSale, voidSale, checkout
+  voidSale, checkout
 })
 
 // Same name and usage as before, so your components don't change

@@ -1,10 +1,12 @@
 <script setup>
-import { ref, reactive, computed, provide } from 'vue'
+import { ref, computed, provide } from 'vue'
 import { useRoute } from 'vue-router'
 import logoImg from '../assets/logo.svg'
 import NotificationBell from './NotificationBell.vue'
+import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
+const auth = useAuthStore()
 
 // Dynamically sets title based on route meta or path
 const pageTitle = computed(() => route.meta.title || route.name)
@@ -15,30 +17,6 @@ const isProductsPage = computed(() => route.path === '/products' || route.name =
 // Shared search query accessible across child views
 const searchQuery = ref('')
 provide('searchQuery', searchQuery)
-
-// User State (Local reactive object ready for backend integration later)
-const user = reactive({
-  fullName: 'Sarah Geronimo',
-  email: 'sarah@vaulto.com',
-  phone: '0917 000 0000',
-  avatarUrl: ''
-})
-
-const initial = computed(() => user.fullName.trim().charAt(0).toUpperCase() || '?')
-
-const updateUser = (updatedData) => {
-  Object.assign(user, updatedData)
-}
-
-const updateAvatar = (newUrl) => {
-  user.avatarUrl = newUrl
-}
-
-// Provide user object and updater functions to router views
-provide('user', user)
-provide('userInitial', initial)
-provide('updateUser', updateUser)
-provide('updateAvatar', updateAvatar)
 </script>
 
 <template>
@@ -53,7 +31,6 @@ provide('updateAvatar', updateAvatar)
         <p class="section-title">Platform</p>
         <router-link to="/products" class="nav-item">All Products</router-link>
         <router-link to="/categories" class="nav-item">Categories</router-link>
-        <router-link to="/units" class="nav-item">Units</router-link>
 
         <p class="section-title">Transaction & Records</p>
         <router-link to="/sold" class="nav-item">Sold Inventory</router-link>
@@ -84,11 +61,11 @@ provide('updateAvatar', updateAvatar)
 
         <div class="user-profile" :class="{ 'ml-auto': !isProductsPage }">
           <NotificationBell />
-          <div class="avatar">
-            <img v-if="user.avatarUrl" :src="user.avatarUrl" alt="Profile" class="avatar-img" />
-            <span v-else>{{ initial }}</span>
+          <div class="avatar" data-testid="topbar-avatar">
+            <img v-if="auth.user?.avatarUrl" :src="auth.user.avatarUrl" alt="Profile" class="avatar-img" />
+            <span v-else>{{ auth.initial }}</span>
           </div>
-          <span class="user-name">{{ user.fullName }}</span>
+          <span class="user-name" data-testid="topbar-user-name">{{ auth.user?.fullName }}</span>
         </div>
       </header>
 

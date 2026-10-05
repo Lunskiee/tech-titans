@@ -3,19 +3,31 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AuthLayout from '../components/AuthLayout.vue'
 import warehouseImg from '../assets/image_0.png'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
+const auth = useAuthStore()
 
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
+const errorMessage = ref('')
+const loading = ref(false)
 
 const togglePassword = () => {
   showPassword.value = !showPassword.value
 }
 
-const handleLogin = () => {
-  console.log('Logging in...', email.value)
+const handleLogin = async () => {
+  errorMessage.value = ''
+  loading.value = true
+  const result = await auth.login(email.value, password.value)
+  loading.value = false
+
+  if (!result.ok) {
+    errorMessage.value = result.error
+    return
+  }
   router.push('/products')
 }
 </script>
@@ -33,6 +45,8 @@ const handleLogin = () => {
       </div>
 
       <form @submit.prevent="handleLogin" class="auth-form" data-testid="login-form">
+        <p v-if="errorMessage" class="form-error" role="alert" data-testid="login-error">{{ errorMessage }}</p>
+
         <div class="input-group">
           <label for="email">Email</label>
           <input 
@@ -90,9 +104,10 @@ const handleLogin = () => {
         <button 
           type="submit" 
           class="auth-button"
+          :disabled="loading"
           data-testid="login-submit-button"
         >
-          Log In
+          {{ loading ? 'Logging in...' : 'Log In' }}
         </button>
       </form>
 
@@ -167,6 +182,17 @@ const handleLogin = () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.form-error {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #b91c1c;
+  background-color: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
 }
 
 .input-group {
@@ -258,8 +284,13 @@ const handleLogin = () => {
   transition: background-color 0.2s ease;
 }
 
-.auth-button:hover {
+.auth-button:hover:not(:disabled) {
   background-color: #54598a;
+}
+
+.auth-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .footer-link {
