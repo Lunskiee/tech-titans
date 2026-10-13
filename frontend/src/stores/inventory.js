@@ -1,5 +1,6 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { useNotificationStore } from './notifications'
+import { useAuthStore } from './auth'
 
 // One shared source of truth for Products, Units, Categories, POS and Sold Inventory.
 // Saved in this browser's localStorage. Swap the actions for API calls when you add a backend.
@@ -17,6 +18,7 @@ const load = () => {
 
 const saved = load()
 const notifications = useNotificationStore()
+const auth = useAuthStore()
 
 const round2 = (n) => Math.round(Number(n) * 100) / 100
 const round3 = (n) => Math.round(Number(n) * 1000) / 1000
@@ -247,6 +249,9 @@ const checkout = (items) => {
       unitAbbr: units.value.find((u) => u.id === product.unitId)?.abbreviation || '',
       unitPrice: Number(product.price),
       total: lineTotal,
+      // Which account made this sale
+      soldById: auth.user?.id ?? null,
+      soldByName: auth.user?.fullName || 'Unknown',
     })
   })
 

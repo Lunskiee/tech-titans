@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../stores/notifications'
 import { useAuthStore } from '../stores/auth'
@@ -100,18 +100,40 @@ const removePicture = () => {
 }
 
 // ---------- Other settings ----------
+// Business settings are saved per account (see stores/settings.js)
 const business = reactive({
-  storeName: 'Vaulto Store',
-  address: '',
-  currency: settings.business.currency, // shared: drives the money format in Products, POS and Sold Inventory
-  lowStockThreshold: 10,
+  storeName: settings.business.storeName,
+  address: settings.business.address,
+  currency: settings.business.currency, // drives the money format in Products, POS and Sold Inventory
+  lowStockThreshold: settings.business.lowStockThreshold,
 })
 
-// Shared with the bell, so these toggles control which alerts appear
+// Shared with the bell, so these toggles control which alerts appear (saved per account)
 const notifications = useNotificationStore().preferences
 
-const password = reactive({ current: '', next: '', confirm: '' })
-const show = reactive({ current: false, next: false, confirm: false }) // show/hide for each password field
+// ---------- Password ----------
+// The saved password is locked. It only changes after you click "Change password".
+const editingPassword = ref(false)
+const showSaved = ref(false)
+const password = reactive({ next: '', confirm: '' })
+const show = reactive({ next: false, confirm: false }) // show/hide for each new password field
+
+// If the real password isn't viewable yet (older account), circles are still shown
+const hasSavedPassword = computed(() => !!auth.savedPassword)
+const savedDisplay = computed(() => (hasSavedPassword.value ? auth.savedPassword : '**********'))
+
+const startEditPassword = () => {
+  errorMessage.value = ''
+  savedMessage.value = ''
+  editingPassword.value = true
+}
+
+const cancelEditPassword = () => {
+  password.next = password.confirm = ''
+  show.next = show.confirm = false
+  errorMessage.value = ''
+  editingPassword.value = false
+}
 
 const flash = (msg) => {
   errorMessage.value = ''
@@ -144,15 +166,20 @@ const saveBusiness = () => {
     errorMessage.value = 'Store name is required.'
     return
   }
-  settings.update({ currency: business.currency })
+  settings.update({
+    storeName: business.storeName.trim(),
+    address: business.address.trim(),
+    currency: business.currency,
+    lowStockThreshold: Number(business.lowStockThreshold) || 0,
+  })
   flash('Business settings saved.')
 }
 
 const saveNotifications = () => flash('Notification preferences saved.')
 
 const changePassword = async () => {
-  if (!password.current || !password.next || !password.confirm) {
-    errorMessage.value = 'Fill in all password fields.'
+  if (!password.next || !password.confirm) {
+    errorMessage.value = 'Enter and confirm your new password.'
     return
   }
   if (password.next.length < 8) {
@@ -163,15 +190,16 @@ const changePassword = async () => {
     errorMessage.value = 'New password and confirmation do not match.'
     return
   }
-  const result = await auth.changePassword(password.current, password.next)
+  const result = await auth.setPassword(password.next)
   if (!result.ok) {
     errorMessage.value = result.error
     return
   }
-  // The new password is now the current one, so it replaces the old one in that field
   const newPassword = password.next
-  password.current = newPassword
   password.next = password.confirm = ''
+  show.next = show.confirm = false
+  showSaved.value = false
+  editingPassword.value = false // locked again, now showing the new password as circles
   flash('Password updated.')
 
   // Ask the browser's password manager (Google, Edge) to save the new password right away
@@ -303,10 +331,48 @@ const handleLogout = () => {
       <!-- Security -->
       <section v-if="activeTab === 'security'">
         <h3>Security</h3>
-        <p class="hint">Use at least 8 characters for your new password.</p>
+        <p class="hint">Your saved password is locked. Click "Change password" when you want to update it.</p>
 
-        <form @submit.prevent="changePassword">
-          <!-- Lets the browser's password manager fill the right saved password -->
+        <!-- Saved password: locked, shown as circles, viewable with Show -->
+        <div class="form-group">
+          <label for="saved-password">
+            Current password
+            <span class="saved-badge" data-testid="password-saved-badge">✓ Saved</span>
+          </label>
+          <div class="pw-field">
+            <input
+              id="saved-password"
+              :type="showSaved && hasSavedPassword ? 'text' : 'password'"
+              :value="savedDisplay"
+              readonly
+              tabindex="-1"
+              autocomplete="new-password"
+              class="form-input saved-input"
+              data-testid="saved-password-display"
+            />
+            <button
+              v-if="hasSavedPassword"
+              type="button"
+              class="pw-toggle"
+              @click="showSaved = !showSaved"
+              :aria-label="showSaved ? 'Hide saved password' : 'Show saved password'"
+              data-testid="toggle-saved-password-button"
+            >{{ showSaved ? 'Hide' : 'Show' }}</button>
+          </div>
+          <small v-if="!hasSavedPassword" class="field-note">Log out and log back in once, and you'll be able to view your password here.</small>
+        </div>
+
+        <button
+          v-if="!editingPassword"
+          type="button"
+          class="btn-save"
+          @click="startEditPassword"
+          data-testid="start-change-password-button"
+        >Change password</button>
+
+        <!-- New password: only appears after clicking "Change password" -->
+        <form v-else @submit.prevent="changePassword">
+          <!-- Lets the browser's password manager save the new password for the right account -->
           <input
             type="text"
             :value="auth.user?.email"
@@ -316,28 +382,6 @@ const handleLogout = () => {
             aria-hidden="true"
             readonly
           />
-
-          <div class="form-group">
-            <label for="current-password">Current password</label>
-            <div class="pw-field">
-              <input
-                id="current-password"
-                v-model="password.current"
-                :type="show.current ? 'text' : 'password'"
-                autocomplete="current-password"
-                class="form-input"
-                data-testid="current-password-input"
-              />
-              <button
-                type="button"
-                class="pw-toggle"
-                @click="show.current = !show.current"
-                :aria-label="show.current ? 'Hide current password' : 'Show current password'"
-                data-testid="toggle-current-password-button"
-              >{{ show.current ? 'Hide' : 'Show' }}</button>
-            </div>
-            <small class="field-note">For your safety your saved password is never displayed. Type it to confirm it's you.</small>
-          </div>
 
           <div class="form-row">
             <div class="form-group">
@@ -382,7 +426,10 @@ const handleLogout = () => {
             </div>
           </div>
 
-          <button type="submit" class="btn-save" data-testid="change-password-button">Update password</button>
+          <div class="btn-row">
+            <button type="submit" class="btn-save" data-testid="change-password-button">Update password</button>
+            <button type="button" class="btn-cancel" @click="cancelEditPassword" data-testid="cancel-change-password-button">Cancel</button>
+          </div>
         </form>
 
         <hr />
@@ -433,12 +480,18 @@ const handleLogout = () => {
 .form-input:focus { border-color: #5d5b8d; }
 .btn-save { background: #1e1b4b; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 8px; }
 .btn-save:hover { background: #2e2a6b; }
+.btn-row { display: flex; gap: 12px; align-items: center; }
+.btn-cancel { background: #f3f4f6; border: 1px solid #d1d5db; color: #374151; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 8px; }
+.btn-cancel:hover { background: #e5e7eb; }
 
 /* Password fields */
 .pw-field { position: relative; display: flex; }
 .pw-field .form-input { width: 100%; box-sizing: border-box; padding-right: 64px; }
 .pw-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #4338ca; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
 .field-note { font-size: 0.8rem; color: #6b7280; }
+.saved-badge { margin-left: 8px; padding: 2px 8px; background: #dcfce7; color: #166534; border-radius: 999px; font-size: 0.7rem; font-weight: 700; }
+.saved-input { background: #f3f4f6; color: #111827; cursor: default; }
+.saved-input:focus { border-color: #d1d5db; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); opacity: 0; }
 
 /* Toggles */

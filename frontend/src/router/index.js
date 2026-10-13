@@ -43,11 +43,11 @@ const router = createRouter({
         { path: 'contacts', name: 'contacts', component: ContactsView, meta: { title: 'Contacts' } },
         { path: 'settings', name: 'settings', component: SettingsView, meta: { title: 'Settings' } },
 
-        // Admin routes
-        { path: 'admin/dashboard', name: 'admin-dashboard', component: AdminDashboardView, meta: { title: 'Admin Dashboard' } },
-        { path: 'admin/users', name: 'admin-users', component: UserManagementView, meta: { title: 'User Management' } },
-        { path: 'admin/reports', name: 'admin-reports', component: ReportsView, meta: { title: 'Reports' } },
-        { path: 'admin/logs', name: 'admin-logs', component: ActivityLogsView, meta: { title: 'Activity Logs' } }
+        // Admin routes (only @admin.com accounts can open these)
+        { path: 'admin/dashboard', name: 'admin-dashboard', component: AdminDashboardView, meta: { title: 'Admin Dashboard', admin: true } },
+        { path: 'admin/users', name: 'admin-users', component: UserManagementView, meta: { title: 'User Management', admin: true } },
+        { path: 'admin/reports', name: 'admin-reports', component: ReportsView, meta: { title: 'Reports', admin: true } },
+        { path: 'admin/logs', name: 'admin-logs', component: ActivityLogsView, meta: { title: 'Activity Logs', admin: true } }
       ]
     },
 
@@ -59,10 +59,22 @@ const router = createRouter({
 // Only logged-in users can open the app pages
 const publicPages = ['login', 'signup', 'forgot-password']
 
-router.beforeEach((to) => {
+router.beforeEach((to, from) => {
   const auth = useAuthStore()
+
+  // 1. Must be logged in
   if (!publicPages.includes(to.name) && !auth.isLoggedIn) {
     return { name: 'login' }
+  }
+
+  // 2. Staff cannot open admin pages
+  if (to.meta.admin && !auth.isAdmin) {
+    return { name: 'products' }
+  }
+
+  // 3. Admins land on the dashboard right after logging in
+  if (from.name === 'login' && auth.isAdmin && !to.meta.admin) {
+    return { name: 'admin-dashboard' }
   }
 })
 

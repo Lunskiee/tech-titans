@@ -28,6 +28,15 @@ provide('searchQuery', searchQuery)
       </div>
 
       <nav class="nav-section">
+        <!-- Admin (only for @admin.com accounts) -->
+        <template v-if="auth.isAdmin">
+          <p class="section-title">Admin</p>
+          <router-link to="/admin/dashboard" class="nav-item">Dashboard</router-link>
+          <router-link to="/admin/users" class="nav-item">User Management</router-link>
+          <router-link to="/admin/reports" class="nav-item">Reports</router-link>
+          <router-link to="/admin/logs" class="nav-item">Activity Logs</router-link>
+        </template>
+
         <p class="section-title">Platform</p>
         <router-link to="/products" class="nav-item">All Products</router-link>
         <router-link to="/categories" class="nav-item">Categories</router-link>
@@ -40,13 +49,6 @@ provide('searchQuery', searchQuery)
 
         <p class="section-title">Others</p>
         <router-link to="/settings" class="nav-item">Settings</router-link>
-
-        <!-- Admin -->
-        <p class="section-title">Admin</p>
-        <router-link to="/admin/dashboard" class="nav-item">Dashboard</router-link>
-        <router-link to="/admin/users" class="nav-item">User Management</router-link>
-        <router-link to="/admin/reports" class="nav-item">Reports</router-link>
-        <router-link to="/admin/logs" class="nav-item">Activity Logs</router-link>
       </nav>
     </aside>
 
@@ -88,7 +90,7 @@ provide('searchQuery', searchQuery)
 .dashboard-container { display: flex; width: 100vw; height: 100vh; background: #f3f4f6; }
 
 /* Sidebar */
-.sidebar { width: 240px; background: #5d5b8d; color: #fff; padding: 20px 0; display: flex; flex-direction: column; flex-shrink: 0; }
+.sidebar { width: 240px; background: #5d5b8d; color: #fff; padding: 20px 0; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
 .brand { padding: 0 24px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; }
 .brand-logo { height: 48px; width: auto; max-width: 100%; display: block; object-fit: contain; }
 .nav-section { padding: 16px 12px; }
