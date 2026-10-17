@@ -1,4 +1,5 @@
 import { ref, reactive, computed } from 'vue'
+import { useActivityStore } from './activity'
 
 // Demo-level auth: accounts live in this browser's localStorage.
 // Replace register/login/updateProfile/changePassword with API calls when you add a backend.
@@ -14,6 +15,8 @@ const NO_CRYPTO = {
   ok: false,
   error: 'Secure features are unavailable here. Open the app at http://localhost or over https.',
 }
+
+const activity = useActivityStore()
 
 // ---------- Roles (decided by the email domain) ----------
 const ADMIN_DOMAIN = '@admin.com'
@@ -39,6 +42,38 @@ const write = (key, value) => {
   }
 }
 
+// ---------- Who is logged in (remembered per TAB) ----------
+// Each browser tab keeps its own login, so one tab can be admin and another staff
+// without switching each other. Closing the tab logs that tab out.
+const readSession = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem(SESSION_KEY))
+  } catch {
+    return null
+  }
+}
+const writeSession = (id) => {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(id))
+  } catch {
+    /* ignore */
+  }
+}
+const clearSession = () => {
+  try {
+    sessionStorage.removeItem(SESSION_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
+// Older versions kept the login in localStorage, shared by every tab. Remove that leftover.
+try {
+  localStorage.removeItem(SESSION_KEY)
+} catch {
+  /* ignore */
+}
+
 // Hashing needs the browser's crypto API, which only exists on localhost or https
 const hashAvailable = () => !!globalThis.crypto?.subtle
 
@@ -53,17 +88,17 @@ const normalizeEmail = (email) => String(email || '').trim().toLowerCase()
 const validEmail = (email) => /^\S+@\S+\.\S+$/.test(email)
 
 const accounts = ref(read(ACCOUNTS_KEY, []))
-const sessionId = ref(read(SESSION_KEY, null))
+const sessionId = ref(readSession())
 
-// Reload from storage so this tab never works with out-of-date accounts
+// Reload accounts from storage so this tab never works with out-of-date data.
+// (The logged-in account is NOT reloaded: it belongs to this tab only.)
 const refresh = () => {
   accounts.value = read(ACCOUNTS_KEY, [])
-  sessionId.value = read(SESSION_KEY, null)
 }
 
-// Keep this tab in sync when another tab or window registers, changes a password or logs out
+// Keep this tab in sync when another tab or window registers or changes a password
 window.addEventListener('storage', (event) => {
-  if (event.key === null || event.key === ACCOUNTS_KEY || event.key === SESSION_KEY) refresh()
+  if (event.key === null || event.key === ACCOUNTS_KEY) refresh()
 })
 
 const saveAccounts = () => write(ACCOUNTS_KEY, accounts.value)
@@ -146,6 +181,12 @@ const register = async ({ fullName, email, phone = '', password }) => {
     accounts.value.pop() // do not keep an account that was not saved
     return { ok: false, error: SAVE_FAILED }
   }
+
+  activity.log({
+    type: 'register',
+    message: `Created a ${roleFromEmail(mail)} account`,
+    actor: { id, fullName: name, email: mail },
+  })
   return { ok: true }
 }
 
@@ -165,17 +206,16 @@ const login = async (email, password) => {
   }
 
   sessionId.value = account.id
-  write(SESSION_KEY, account.id)
+  writeSession(account.id)
+  activity.log({ type: 'login', message: 'Logged in', actor: account })
   return { ok: true }
 }
 
 const logout = () => {
+  const account = currentAccount.value
+  if (account) activity.log({ type: 'logout', message: 'Logged out', actor: account })
   sessionId.value = null
-  try {
-    localStorage.removeItem(SESSION_KEY)
-  } catch {
-    /* ignore */
-  }
+  clearSession()
 }
 
 const updateProfile = ({ fullName, email, phone, avatarUrl }) => {
@@ -221,7 +261,9 @@ const changePassword = async (currentPassword, newPassword) => {
   if (newPassword.length < 8) return { ok: false, error: 'New password must be at least 8 characters.' }
   if (newPassword === currentPassword) return { ok: false, error: 'New password must be different from the current one.' }
 
-  return savePassword(account.id, await hash(`${account.id}:${newPassword}`), newPassword)
+  const saved = savePassword(account.id, await hash(`${account.id}:${newPassword}`), newPassword)
+  if (saved.ok) activity.log({ type: 'password_change', message: 'Changed their password', actor: account })
+  return saved
 }
 
 // Sets a new password for the logged-in account without retyping the old one (used by Settings > Security)
@@ -237,7 +279,9 @@ const setPassword = async (newPassword) => {
   if (newHash === account.passwordHash) {
     return { ok: false, error: 'New password must be different from the current one.' }
   }
-  return savePassword(account.id, newHash, newPassword)
+  const saved = savePassword(account.id, newHash, newPassword)
+  if (saved.ok) activity.log({ type: 'password_change', message: 'Changed their password', actor: account })
+  return saved
 }
 
 // ---------- Forgot / reset password ----------
@@ -295,6 +339,7 @@ const resetPassword = async (email, code, newPassword) => {
 
   delete resets[mail]
   write(RESET_KEY, resets)
+  activity.log({ type: 'password_change', message: 'Reset their password', actor: account })
   return { ok: true }
 }
 

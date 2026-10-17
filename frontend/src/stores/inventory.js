@@ -1,6 +1,7 @@
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { useNotificationStore } from './notifications'
 import { useAuthStore } from './auth'
+import { useActivityStore } from './activity'
 
 // One shared source of truth for Products, Units, Categories, POS and Sold Inventory.
 // Saved in this browser's localStorage. Swap the actions for API calls when you add a backend.
@@ -19,6 +20,7 @@ const load = () => {
 const saved = load()
 const notifications = useNotificationStore()
 const auth = useAuthStore()
+const activity = useActivityStore()
 
 const round2 = (n) => Math.round(Number(n) * 100) / 100
 const round3 = (n) => Math.round(Number(n) * 1000) / 1000
@@ -114,6 +116,11 @@ const addProduct = ({ sku, name, categoryId, unitId, price, stock, image = null 
     stock: round3(stock),
     image,
   })
+  activity.log({
+    type: 'product_add',
+    message: `Added product "${String(name).trim()}" (${String(sku).trim()})`,
+    actor: auth.user,
+  })
   checkLowStock()
   return { ok: true }
 }
@@ -127,12 +134,25 @@ const updateProduct = (id, patch) => {
   if (patch.price !== undefined) product.price = round2(patch.price)
   if (patch.stock !== undefined) product.stock = round3(patch.stock)
   if (patch.image !== undefined) product.image = patch.image
+  activity.log({
+    type: 'product_edit',
+    message: `Edited product "${product.name}" (${product.sku})`,
+    actor: auth.user,
+  })
   checkLowStock()
   return { ok: true }
 }
 
 const removeProduct = (id) => {
+  const product = products.value.find((p) => p.id === id)
   products.value = products.value.filter((p) => p.id !== id)
+  if (product) {
+    activity.log({
+      type: 'product_delete',
+      message: `Deleted product "${product.name}" (${product.sku})`,
+      actor: auth.user,
+    })
+  }
   return { ok: true }
 }
 
@@ -184,6 +204,11 @@ const addCategory = ({ name, description = '' }) => {
   if (!String(name || '').trim()) return { ok: false, error: 'Category name is required.' }
   if (categories.value.some((c) => same(c.name, name))) return { ok: false, error: 'That category already exists.' }
   categories.value.push({ id: Date.now(), name: String(name).trim(), description: String(description).trim() })
+  activity.log({
+    type: 'category_add',
+    message: `Added category "${String(name).trim()}"`,
+    actor: auth.user,
+  })
   return { ok: true }
 }
 
@@ -196,6 +221,11 @@ const updateCategory = (id, { name, description = '' }) => {
   }
   category.name = String(name).trim()
   category.description = String(description).trim()
+  activity.log({
+    type: 'category_edit',
+    message: `Edited category "${category.name}"`,
+    actor: auth.user,
+  })
   return { ok: true }
 }
 
@@ -207,6 +237,11 @@ const removeCategory = (id) => {
     return { ok: false, error: `"${category.name}" is used by ${used} product${used > 1 ? 's' : ''}. Move those products first.` }
   }
   categories.value = categories.value.filter((c) => c.id !== id)
+  activity.log({
+    type: 'category_delete',
+    message: `Deleted category "${category.name}"`,
+    actor: auth.user,
+  })
   return { ok: true }
 }
 
@@ -255,6 +290,12 @@ const checkout = (items) => {
     })
   })
 
+  activity.log({
+    type: 'sale',
+    message: `Completed sale #${orderId} (${lines.length} ${lines.length === 1 ? 'item' : 'items'})`,
+    actor: auth.user,
+    amount: round2(total),
+  })
   checkLowStock()
   return { ok: true, orderId, total: round2(total) }
 }
@@ -270,13 +311,24 @@ const voidSale = (id) => {
   const product = products.value.find((p) => p.id === sale.productId)
   if (product) product.stock = round3(Number(product.stock) + Number(sale.quantity))
   sales.value.splice(index, 1)
+  activity.log({
+    type: 'sale_void',
+    message: `Voided sale #${sale.orderId}: ${sale.name} × ${sale.quantity}`,
+    actor: auth.user,
+    amount: sale.total,
+  })
   return { ok: true }
 }
+
+// ---------- Saving ----------
+// While another tab's changes are being loaded in, do not save them straight back
+let applyingExternal = false
 
 // Keep everything after a page refresh
 watch(
   [units, categories, products, sales, lastOrderId],
   () => {
+    if (applyingExternal) return
     try {
       localStorage.setItem(
         STORAGE_KEY,
@@ -299,6 +351,23 @@ watch(
   },
   { deep: true }
 )
+
+// When another tab changes the inventory (for example a staff tab makes a sale),
+// load it here so this tab stays up to date and never overwrites it.
+window.addEventListener('storage', (event) => {
+  if (event.key !== STORAGE_KEY) return
+  const data = load()
+  if (!data) return
+  applyingExternal = true
+  units.value = data.units || []
+  categories.value = data.categories || []
+  products.value = data.products || []
+  sales.value = data.sales || []
+  lastOrderId.value = data.lastOrderId || 1000
+  nextTick(() => {
+    applyingExternal = false
+  })
+})
 
 const store = reactive({
   units,

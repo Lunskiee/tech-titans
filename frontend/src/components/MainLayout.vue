@@ -33,7 +33,6 @@ provide('searchQuery', searchQuery)
           <p class="section-title">Admin</p>
           <router-link to="/admin/dashboard" class="nav-item">Dashboard</router-link>
           <router-link to="/admin/users" class="nav-item">User Management</router-link>
-          <router-link to="/admin/reports" class="nav-item">Reports</router-link>
           <router-link to="/admin/logs" class="nav-item">Activity Logs</router-link>
         </template>
 

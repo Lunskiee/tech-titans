@@ -16,7 +16,6 @@ import SettingsView from '../views/SettingsView.vue'
 // Admin pages
 import AdminDashboardView from '../views/admin/DashboardView.vue'
 import UserManagementView from '../views/admin/UserManagementView.vue'
-import ReportsView from '../views/admin/ReportsView.vue'
 import ActivityLogsView from '../views/admin/ActivityLogsView.vue'
 
 import { useAuthStore } from '../stores/auth'
@@ -46,7 +45,6 @@ const router = createRouter({
         // Admin routes (only @admin.com accounts can open these)
         { path: 'admin/dashboard', name: 'admin-dashboard', component: AdminDashboardView, meta: { title: 'Admin Dashboard', admin: true } },
         { path: 'admin/users', name: 'admin-users', component: UserManagementView, meta: { title: 'User Management', admin: true } },
-        { path: 'admin/reports', name: 'admin-reports', component: ReportsView, meta: { title: 'Reports', admin: true } },
         { path: 'admin/logs', name: 'admin-logs', component: ActivityLogsView, meta: { title: 'Activity Logs', admin: true } }
       ]
     },
