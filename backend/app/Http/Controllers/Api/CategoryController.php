@@ -33,6 +33,27 @@ class CategoryController extends Controller
         ], 201);
     }
 
+    public function show(Category $category): JsonResponse
+    {
+        return response()->json([
+            'category' => $category,
+        ]);
+    }
+
+    public function update(Request $request, Category $category): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:100|unique:categories,name,'.$category->id,
+        ]);
+
+        $category->update($validated);
+
+        return response()->json([
+            'message' => 'Category updated successfully',
+            'category' => $category,
+        ]);
+    }
+
     public function destroy(Category $category): JsonResponse
     {
         $category->delete();
@@ -42,4 +63,3 @@ class CategoryController extends Controller
         ]);
     }
 }
-

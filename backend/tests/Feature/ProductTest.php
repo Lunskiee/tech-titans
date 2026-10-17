@@ -186,7 +186,7 @@ class ProductTest extends TestCase
             'stock_quantity' => 3,
         ]);
 
-        $response = $this->getJson('/api/products/' . $product->product_id);
+        $response = $this->getJson('/api/products/'.$product->product_id);
 
         $response->assertStatus(200)
             ->assertJson([
@@ -207,7 +207,7 @@ class ProductTest extends TestCase
             'stock_quantity' => 5,
         ]);
 
-        $response = $this->putJson('/api/products/' . $product->product_id, [
+        $response = $this->putJson('/api/products/'.$product->product_id, [
             'name' => 'Updated Product Name',
             'price' => 15.50,
             'stock_quantity' => 20,
@@ -243,7 +243,7 @@ class ProductTest extends TestCase
             'image_url' => $fakePath,
         ]);
 
-        $response = $this->deleteJson('/api/products/' . $product->product_id);
+        $response = $this->deleteJson('/api/products/'.$product->product_id);
 
         $response->assertStatus(200)
             ->assertJson([
@@ -256,4 +256,3 @@ class ProductTest extends TestCase
         Storage::disk('public')->assertMissing($fakePath);
     }
 }
-
