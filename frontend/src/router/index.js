@@ -34,6 +34,7 @@ const router = createRouter({
       component: MainLayout,
       redirect: '/login', // always start at login
       children: [
+        { path: 'dashboard', name: 'dashboard', component: AdminDashboardView, meta: { title: 'Dashboard' } },
         { path: 'products', name: 'products', component: ProductsView, meta: { title: 'All Products' } },
         { path: 'categories', name: 'categories', component: CategoriesView, meta: { title: 'Categories' } },
         { path: 'sold', name: 'sold', component: SoldInventoryView, meta: { title: 'Sold Inventory' } },
@@ -42,8 +43,8 @@ const router = createRouter({
         { path: 'contacts', name: 'contacts', component: ContactsView, meta: { title: 'Contacts' } },
         { path: 'settings', name: 'settings', component: SettingsView, meta: { title: 'Settings' } },
 
-        // Admin routes (only @admin.com accounts can open these)
-        { path: 'admin/dashboard', name: 'admin-dashboard', component: AdminDashboardView, meta: { title: 'Admin Dashboard', admin: true } },
+        // Admin routes
+        { path: 'admin/dashboard', name: 'admin-dashboard', component: AdminDashboardView, meta: { title: 'Admin Dashboard' } },
         { path: 'admin/users', name: 'admin-users', component: UserManagementView, meta: { title: 'User Management', admin: true } },
         { path: 'admin/logs', name: 'admin-logs', component: ActivityLogsView, meta: { title: 'Activity Logs', admin: true } }
       ]
@@ -68,11 +69,6 @@ router.beforeEach((to, from) => {
   // 2. Staff cannot open admin pages
   if (to.meta.admin && !auth.isAdmin) {
     return { name: 'products' }
-  }
-
-  // 3. Admins land on the dashboard right after logging in
-  if (from.name === 'login' && auth.isAdmin && !to.meta.admin) {
-    return { name: 'admin-dashboard' }
   }
 })
 

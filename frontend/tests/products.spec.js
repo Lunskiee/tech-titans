@@ -2,6 +2,9 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Products & Add Product Modal Flow', () => {
   test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      sessionStorage.setItem('vaulto-session', JSON.stringify(1001))
+    })
     await page.goto('http://localhost:5173/products')
   })
 

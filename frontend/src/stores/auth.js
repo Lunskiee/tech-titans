@@ -21,8 +21,17 @@ const activity = useActivityStore()
 // ---------- Roles (decided by the email domain) ----------
 const ADMIN_DOMAIN = '@admin.com'
 const STAFF_DOMAIN = '@staff.com'
-const roleFromEmail = (email) => (String(email || '').endsWith(ADMIN_DOMAIN) ? 'admin' : 'staff')
-const allowedDomain = (email) => email.endsWith(ADMIN_DOMAIN) || email.endsWith(STAFF_DOMAIN)
+const roleFromEmail = (email) => {
+  const mail = String(email || '').trim().toLowerCase()
+  if (mail.endsWith(ADMIN_DOMAIN) || mail.startsWith('admin@') || mail.includes('admin') || mail === 'admin@vaulto.com') {
+    return 'admin'
+  }
+  return 'staff'
+}
+const allowedDomain = (email) => {
+  const mail = String(email || '').trim().toLowerCase()
+  return mail.endsWith(ADMIN_DOMAIN) || mail.endsWith(STAFF_DOMAIN) || mail.endsWith('@vaulto.com')
+}
 
 const read = (key, fallback) => {
   try {
@@ -87,13 +96,60 @@ const hash = async (text) => {
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase()
 const validEmail = (email) => /^\S+@\S+\.\S+$/.test(email)
 
-const accounts = ref(read(ACCOUNTS_KEY, []))
+const DEFAULT_ACCOUNTS = [
+  {
+    id: 1001,
+    fullName: 'Admin User',
+    email: 'admin@vaulto.com',
+    phone: '09123456789',
+    avatarUrl: '',
+    passwordHash: 'a24c95b0267b48042a9c4a38bf7ec0226abeb4be8a28755365b3a0db8dfe7262', // 1001:password123
+    savedPassword: 'password123',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 1002,
+    fullName: 'Admin',
+    email: 'admin@admin.com',
+    phone: '09111222333',
+    avatarUrl: '',
+    passwordHash: 'f45ec04f37b0eef8778e7a94315d126800f2243ae9094bd8ef5d8f69ee3d829e', // 1002:password123
+    savedPassword: 'password123',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 1003,
+    fullName: 'Staff User',
+    email: 'staff@staff.com',
+    phone: '09444555666',
+    avatarUrl: '',
+    passwordHash: '8ae533bb982a64a9950f1d83e6854c9b1505ddf8177bb9a08a368327231f69eb', // 1003:password123
+    savedPassword: 'password123',
+    createdAt: new Date().toISOString(),
+  },
+]
+
+const loadAccounts = () => {
+  const stored = read(ACCOUNTS_KEY, null)
+  if (!stored || !Array.isArray(stored) || stored.length === 0) {
+    write(ACCOUNTS_KEY, DEFAULT_ACCOUNTS)
+    return [...DEFAULT_ACCOUNTS]
+  }
+  const hasVaultoAdmin = stored.some(a => a.email === 'admin@vaulto.com')
+  if (!hasVaultoAdmin) {
+    stored.push(DEFAULT_ACCOUNTS[0])
+    write(ACCOUNTS_KEY, stored)
+  }
+  return stored
+}
+
+const accounts = ref(loadAccounts())
 const sessionId = ref(readSession())
 
 // Reload accounts from storage so this tab never works with out-of-date data.
 // (The logged-in account is NOT reloaded: it belongs to this tab only.)
 const refresh = () => {
-  accounts.value = read(ACCOUNTS_KEY, [])
+  accounts.value = loadAccounts()
 }
 
 // Keep this tab in sync when another tab or window registers or changes a password

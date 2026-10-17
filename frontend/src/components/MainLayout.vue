@@ -28,13 +28,8 @@ provide('searchQuery', searchQuery)
       </div>
 
       <nav class="nav-section">
-        <!-- Admin (only for @admin.com accounts) -->
-        <template v-if="auth.isAdmin">
-          <p class="section-title">Admin</p>
-          <router-link to="/admin/dashboard" class="nav-item">Dashboard</router-link>
-          <router-link to="/admin/users" class="nav-item">User Management</router-link>
-          <router-link to="/admin/logs" class="nav-item">Activity Logs</router-link>
-        </template>
+        <p class="section-title">Overview</p>
+        <router-link to="/dashboard" class="nav-item" data-testid="nav-dashboard">Dashboard</router-link>
 
         <p class="section-title">Platform</p>
         <router-link to="/products" class="nav-item">All Products</router-link>
@@ -48,6 +43,14 @@ provide('searchQuery', searchQuery)
 
         <p class="section-title">Others</p>
         <router-link to="/settings" class="nav-item">Settings</router-link>
+
+        <!-- Admin -->
+        <template v-if="auth.isAdmin">
+          <p class="section-title">Admin</p>
+          <router-link to="/admin/dashboard" class="nav-item">Admin Dashboard</router-link>
+          <router-link to="/admin/users" class="nav-item">User Management</router-link>
+          <router-link to="/admin/logs" class="nav-item">Activity Logs</router-link>
+        </template>
       </nav>
     </aside>
 
