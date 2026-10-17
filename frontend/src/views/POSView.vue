@@ -13,6 +13,7 @@ const categoryFilter = ref('all')
 const cart = ref([])            // [{ productId, quantity }]
 const cashReceived = ref('')
 const checkoutError = ref('')
+const showConfirm = ref(false)  // "Confirm Order" window (nothing is sold until you confirm)
 const receipt = ref(null)
 
 const money = (n) => settings.format(n)
@@ -92,7 +93,8 @@ const clearCart = () => {
 }
 
 // ---------- Checkout ----------
-const charge = () => {
+// Step 1: review the order. Nothing is sold and no stock changes here.
+const placeOrder = () => {
   checkoutError.value = ''
   if (cartLines.value.length === 0) {
     checkoutError.value = 'Add at least one item to the cart.'
@@ -102,8 +104,18 @@ const charge = () => {
     checkoutError.value = 'Cash received is less than the total.'
     return
   }
+  showConfirm.value = true
+}
 
+// Closing the window (Cancel or the X) leaves the cart and the stock exactly as they were
+const cancelOrder = () => {
+  showConfirm.value = false
+}
+
+// Step 2: confirm. This is the only place stock goes down.
+const confirmSale = () => {
   const result = store.checkout(cart.value.map(i => ({ productId: i.productId, quantity: i.quantity })))
+  showConfirm.value = false
   if (!result.ok) {
     checkoutError.value = result.error
     return
@@ -260,16 +272,48 @@ const closeReceipt = () => { receipt.value = null }
             type="button"
             class="btn-charge"
             :disabled="cartLines.length === 0"
-            @click="charge"
+            @click="placeOrder"
             data-testid="pos-charge-button"
           >
-            Complete Sale
+            Place Order
           </button>
         </div>
       </aside>
     </div>
 
-    <!-- Receipt modal -->
+    <!-- Confirm order window: stock only goes down after "Confirm Sale" -->
+    <div v-if="showConfirm" class="modal-overlay" @click.self="cancelOrder" data-testid="pos-confirm-overlay">
+      <div class="modal-card" data-testid="pos-confirm">
+        <div class="modal-header">
+          <h3>Confirm Order</h3>
+          <button type="button" class="btn-close" @click="cancelOrder" data-testid="pos-confirm-close">✕</button>
+        </div>
+
+        <p class="receipt-meta">Check the order below. Stock is only reduced after you confirm.</p>
+
+        <table class="receipt-table">
+          <tbody>
+            <tr v-for="l in cartLines" :key="l.id" data-testid="pos-confirm-line">
+              <td>{{ l.name }}<br /><small>{{ l.quantity }} {{ l.unitAbbr }} × {{ money(l.unitPrice) }}</small></td>
+              <td class="right">{{ money(l.lineTotal) }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="receipt-totals">
+          <div class="total-row"><span>Total</span><strong data-testid="pos-confirm-total">{{ money(cartTotal) }}</strong></div>
+          <div v-if="cashReceived !== ''" class="receipt-small"><span>Cash received</span><span>{{ money(Number(cashReceived)) }}</span></div>
+          <div v-if="change !== null" class="receipt-small"><span>Change</span><span>{{ money(change) }}</span></div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-cancel" @click="cancelOrder" data-testid="pos-confirm-cancel">Cancel</button>
+          <button type="button" class="btn-save" @click="confirmSale" data-testid="pos-confirm-sale">Confirm Sale</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Receipt modal (shown after the sale is confirmed) -->
     <div v-if="receipt" class="modal-overlay" @click.self="closeReceipt" data-testid="pos-receipt-overlay">
       <div class="modal-card" data-testid="pos-receipt">
         <div class="modal-header">
@@ -621,7 +665,7 @@ const closeReceipt = () => { receipt.value = null }
   font-size: 0.85rem; 
 }
 
-/* Receipt modal */
+/* Confirm + receipt windows */
 .modal-overlay { 
   position: fixed; 
   inset: 0; 
@@ -635,6 +679,8 @@ const closeReceipt = () => { receipt.value = null }
   background: #fff; 
   border-radius: 8px; 
   width: 400px; 
+  max-height: 90vh;
+  overflow-y: auto;
   padding: 24px; 
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); 
 }
@@ -692,6 +738,7 @@ const closeReceipt = () => { receipt.value = null }
 .modal-footer { 
   display: flex; 
   justify-content: flex-end; 
+  gap: 12px;
   margin-top: 20px; 
 }
 .btn-save { 
@@ -702,5 +749,20 @@ const closeReceipt = () => { receipt.value = null }
   border-radius: 6px; 
   cursor: pointer; 
   font-weight: 600; 
+}
+.btn-save:hover {
+  background: #312e81;
+}
+.btn-cancel { 
+  background: #f3f4f6; 
+  color: #374151;
+  border: 1px solid #d1d5db; 
+  padding: 8px 20px; 
+  border-radius: 6px; 
+  cursor: pointer; 
+  font-weight: 600; 
+}
+.btn-cancel:hover {
+  background: #e5e7eb;
 }
 </style>

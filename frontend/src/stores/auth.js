@@ -343,6 +343,151 @@ const resetPassword = async (email, code, newPassword) => {
   return { ok: true }
 }
 
+// ---------- Admin: manage users (create, edit, delete) ----------
+// Only an admin can use these. The role always comes from the email domain.
+const requireAdmin = () => {
+  refresh()
+  const me = currentAccount.value
+  if (!me || roleFromEmail(me.email) !== 'admin') return { error: 'Only admins can manage users.' }
+  return { me }
+}
+
+const createUser = async ({ fullName, email, phone = '', password }) => {
+  if (!hashAvailable()) return NO_CRYPTO
+
+  const name = String(fullName || '').trim()
+  const mail = normalizeEmail(email)
+  if (!name || !mail || !password) return { ok: false, error: 'Name, email and password are required.' }
+  if (!validEmail(mail)) return { ok: false, error: 'Enter a valid email address.' }
+  if (!allowedDomain(mail)) {
+    return { ok: false, error: `Use an email ending in ${STAFF_DOMAIN} or ${ADMIN_DOMAIN}.` }
+  }
+  if (password.length < 8) return { ok: false, error: 'Password must be at least 8 characters.' }
+
+  const guard = requireAdmin()
+  if (guard.error) return { ok: false, error: guard.error }
+  if (accounts.value.some(a => a.email === mail)) return { ok: false, error: 'An account with this email already exists.' }
+
+  let id = Date.now()
+  while (accounts.value.some(a => a.id === id)) id += 1
+  const passwordHash = await hash(`${id}:${password}`)
+
+  refresh() // another tab may have changed accounts while we were hashing
+  if (accounts.value.some(a => a.email === mail)) return { ok: false, error: 'An account with this email already exists.' }
+
+  accounts.value.push({
+    id,
+    fullName: name,
+    email: mail,
+    phone: String(phone).trim(),
+    avatarUrl: '',
+    passwordHash,
+    savedPassword: password,
+    createdAt: new Date().toISOString(),
+  })
+
+  if (!saveAccounts()) {
+    accounts.value.pop()
+    return { ok: false, error: SAVE_FAILED }
+  }
+
+  activity.log({
+    type: 'user_create',
+    message: `Added ${roleFromEmail(mail)} user "${name}" (${mail})`,
+    actor: guard.me,
+  })
+  return { ok: true }
+}
+
+// password is optional: leave it empty to keep the user's current password
+const updateUser = async (id, { fullName, email, phone = '', password = '' }) => {
+  const name = String(fullName || '').trim()
+  const mail = normalizeEmail(email)
+  const newPassword = String(password || '')
+  if (!name || !mail) return { ok: false, error: 'Name and email are required.' }
+  if (!validEmail(mail)) return { ok: false, error: 'Enter a valid email address.' }
+  if (newPassword && newPassword.length < 8) return { ok: false, error: 'New password must be at least 8 characters.' }
+  if (newPassword && !hashAvailable()) return NO_CRYPTO
+
+  const newHash = newPassword ? await hash(`${id}:${newPassword}`) : null
+
+  const guard = requireAdmin()
+  if (guard.error) return { ok: false, error: guard.error }
+
+  const account = accounts.value.find(a => a.id === id)
+  if (!account) return { ok: false, error: 'User not found.' }
+  if (accounts.value.some(a => a.email === mail && a.id !== id)) {
+    return { ok: false, error: 'Another account already uses this email.' }
+  }
+  // The email decides the role, so it cannot be changed into a different account type
+  if (roleFromEmail(mail) !== roleFromEmail(account.email)) {
+    return { ok: false, error: `The email decides the account type, so it can't be changed between ${STAFF_DOMAIN} and ${ADMIN_DOMAIN}.` }
+  }
+
+  const before = {
+    fullName: account.fullName,
+    email: account.email,
+    phone: account.phone,
+    passwordHash: account.passwordHash,
+    savedPassword: account.savedPassword,
+  }
+  account.fullName = name
+  account.email = mail
+  account.phone = String(phone || '').trim()
+  if (newHash) {
+    account.passwordHash = newHash
+    account.savedPassword = newPassword
+  }
+
+  if (!saveAccounts()) {
+    Object.assign(account, before)
+    return { ok: false, error: SAVE_FAILED }
+  }
+
+  activity.log({
+    type: 'user_edit',
+    message: `Edited user "${name}" (${mail})${newHash ? ' and set a new password' : ''}`,
+    actor: guard.me,
+  })
+  return { ok: true }
+}
+
+// Admins cannot delete their own account
+const deleteUser = (id) => {
+  const guard = requireAdmin()
+  if (guard.error) return { ok: false, error: guard.error }
+  if (guard.me.id === id) return { ok: false, error: 'You cannot delete your own account.' }
+
+  const index = accounts.value.findIndex(a => a.id === id)
+  if (index === -1) return { ok: false, error: 'User not found.' }
+  const account = accounts.value[index]
+
+  accounts.value.splice(index, 1)
+  if (!saveAccounts()) {
+    accounts.value.splice(index, 0, account) // put it back, nothing was saved
+    return { ok: false, error: SAVE_FAILED }
+  }
+
+  // Remove that user's personal settings, alerts and any pending password reset.
+  // Their past sales and activity stay in the records.
+  try {
+    localStorage.removeItem(`vaulto-settings:${id}`)
+    localStorage.removeItem(`vaulto-notifications:${id}`)
+    const resets = read(RESET_KEY, {})
+    delete resets[account.email]
+    write(RESET_KEY, resets)
+  } catch {
+    /* ignore */
+  }
+
+  activity.log({
+    type: 'user_delete',
+    message: `Deleted user "${account.fullName}" (${account.email})`,
+    actor: guard.me,
+  })
+  return { ok: true }
+}
+
 const store = reactive({
   user,
   isLoggedIn,
@@ -358,6 +503,9 @@ const store = reactive({
   setPassword,
   requestPasswordReset,
   resetPassword,
+  createUser,
+  updateUser,
+  deleteUser,
 })
 
 // One shared store for the whole app
