@@ -89,5 +89,6 @@ npm run db:migrate
 npm run db:seed
 
 Step 5: Launch Application
+cd frontend
 npm run dev
-Open http://localhost:3000 in your web browser.
+Open http://localhost:5173 in your web browser.
